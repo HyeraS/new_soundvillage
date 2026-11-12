@@ -20,6 +20,8 @@ import { getOrCreateRoomShare, getOwnedInteriorItems, getRoom, getSharedRoom } f
 import { getEconomyRoom, getEconomySharedRoom, getOrCreateEconomyRoomShare } from '@/lib/economyV1.client'
 import { createDuoInvite, getDuoRoom, heartbeatDuo, joinDuoInvite, recoverDuo, revokeDuo } from '@/lib/duoApi.client'
 import { useDuoSession } from '@/lib/duoSession'
+import DuoChat from '@/components/DuoChat'
+import { useDuoChat } from '@/lib/useDuoChat'
 import { claimParticipantSession, endLocalParticipantSession, restoreParticipantSession, signInMasterSession } from '@/lib/participantAuth'
 import { clearParticipantEntrySession, readParticipantEntrySession, writeParticipantEntrySession } from '@/lib/participantEntrySession.mjs'
 import { OUTFIT_SHEETS } from '@/components/AssetRegistry'
@@ -322,6 +324,7 @@ export default function HomePage() {
   const [visiting,      setVisiting]      = useState(null) // null | { token, room }
   const duoScreen = resolveDuoPresenceScreen({ screen, visiting:Boolean(visiting) })
   const duo = useDuoSession(duoSession, realtimeClientId, duoScreen)
+  const chat = useDuoChat(duoSession, realtimeClientId)
 
   const createLiveDuoInvite = useCallback(async () => {
     if (!participantId || homePlacedCount < 4 || !['legacy','preview','cutover'].includes(economy.runtimeState)) return
@@ -1090,6 +1093,7 @@ export default function HomePage() {
   // 아직 없으면 평소 StartPanel을 그대로 재사용해서 받고, handleStart가
   // 끝나면(participantId가 생기면) 그제서야 방으로 들어간다 — 그래야 연구
   // 참여자 집계·출석 등 다른 진입 경로와 동일하게 처리된다.
+  const renderGameScreen = () => {
   if (participantId && progressError) {
     return <main style={{minHeight:'100vh',display:'grid',placeItems:'center',background:'#3A2A14',color:'#F5EDD8',fontFamily:'Nunito, sans-serif',textAlign:'center',padding:24}}>
       <div><h1 style={{fontSize:24}}>진행 상태를 불러오지 못했어요</h1><p>완료한 과제가 다시 표시되지 않도록 진행을 멈췄습니다.</p><button onClick={() => window.location.reload()} style={{padding:'10px 18px'}}>다시 불러오기</button></div>
@@ -1525,4 +1529,10 @@ export default function HomePage() {
   }
 
   return null
+  }
+
+  return <>
+    {renderGameScreen()}
+    {participantId && duoSession && <DuoChat key={duoSession.sessionId} chat={chat} role={duoSession.role} />}
+  </>
 }
