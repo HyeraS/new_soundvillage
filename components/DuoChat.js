@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 
 export default function DuoChat({ chat, role }) {
   const [draft, setDraft] = useState('')
+  const hasUnread = !chat.open && !chat.expired && chat.unread > 0
   const bottom = useRef(null)
   useEffect(() => { if (chat.open) bottom.current?.scrollIntoView({ block:'nearest' }) }, [chat.messages.length, chat.open])
   async function submit(event) {
@@ -12,10 +13,14 @@ export default function DuoChat({ chat, role }) {
     if (await chat.send(text)) setDraft(current => current === text ? '' : current)
   }
   return <aside aria-label="동행 채팅" onKeyDown={event => event.stopPropagation()}
-    style={{ position:'fixed', right:16, bottom:16, zIndex:250, width:chat.open ? 'min(340px, calc(100vw - 32px))' : 'auto', fontFamily:'Nunito, sans-serif', color:'#3A2A14' }}>
+    style={{ position:'fixed', left:16, bottom:16, zIndex:250, maxWidth:'calc(100vw - 32px)', width:chat.open ? 'min(340px, calc(100vw - 32px))' : 'auto', fontFamily:'Nunito, sans-serif', color:'#3A2A14' }}>
+    {hasUnread && <div role="status" aria-live="polite" aria-atomic="true"
+      style={{ marginBottom:8, padding:'8px 12px', background:'#FFF1CC', border:'2px solid #C8A96E', borderRadius:10, fontSize:13, boxShadow:'0 3px 12px #0002' }}>
+      친구에게 새 메시지가 왔어요 · {chat.unread}개
+    </div>}
     <button type="button" aria-expanded={chat.open} aria-controls="duo-chat-panel" onClick={chat.toggle}
-      style={{ background:'#F5EDD8', border:'2px solid #C8A96E', borderRadius:12, padding:'10px 16px', cursor:'pointer' }}>
-      동행 채팅 {chat.open ? '접기' : '열기'}{chat.unread > 0 ? ` (${chat.unread})` : ''}
+      style={{ background:hasUnread ? '#FFF1CC' : '#F5EDD8', border:`2px solid ${hasUnread ? '#B85C38' : '#C8A96E'}`, borderRadius:12, padding:'10px 16px', cursor:'pointer' }}>
+      동행 채팅 {chat.open ? '접기' : '열기'}{hasUnread && <span style={{ marginLeft:8, background:'#B84332', color:'#fff', borderRadius:12, padding:'2px 7px', fontWeight:800 }}>{chat.unread}</span>}
     </button>
     {chat.open && <section id="duo-chat-panel" style={{ marginTop:8, background:'#F5EDD8', border:'2px solid #C8A96E', borderRadius:12, padding:12, boxShadow:'0 4px 24px #0003' }}>
       <p role="status" style={{ margin:'0 0 8px', fontSize:12 }}>{chat.expired ? '세션이 종료되어 채팅을 사용할 수 없어요.' : chat.connected ? '현재 초대 세션의 대화' : '채팅 연결 중…'}</p>
