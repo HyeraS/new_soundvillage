@@ -6,6 +6,8 @@ import { isStudyAccessParticipantId, normalizeStudyAccessId } from '@/lib/studyA
    Phase 2 StartPanel — Cozy 낮 감성, 마을 테마
 ───────────────────────────────────────────── */
 const AUTH_ERROR_MESSAGES = {
+  dedicated_sign_in_required: '이 계정은 전용 로그인 방식으로 입장해 주세요.',
+  auth_user_already_bound: '다른 참여자 인증이 남아 있어요. 새로고침 후 다시 입장해 주세요.',
   participant_not_registered: '등록되지 않은 참여자 ID입니다. 진행자에게 확인해 주세요.',
   participant_claimed: '이미 다른 브라우저에 연결된 참여자 ID입니다. 진행자에게 재연결을 요청해 주세요.',
   participant_inactive: '현재 비활성화된 참여자 ID입니다. 진행자에게 문의해 주세요.',

@@ -80,11 +80,10 @@ test('private navigation uses waiting presence without making one participant fo
   assert.match(contract, /\['worldmap', 'interior', 'waiting'\]/)
   assert.doesNotMatch(contract, /'zone'|'museum'|'music'|'nature'/)
   assert.match(page, /resolveDuoPresenceScreen\(\{ screen, visiting:Boolean\(visiting\) \}\)/)
-  assert.match(page, /resolveDuoVisitorFollowAction/)
+  assert.doesNotMatch(page, /resolveDuoVisitorFollowAction|onPartnerLeftScreen/)
   assert.match(navigation, /screen === 'world'[\s\S]*return 'worldmap'/)
   assert.match(navigation, /return 'waiting'/)
-  assert.match(navigation, /peerScreen === 'interior'/)
-  assert.match(navigation, /peerScreen === 'worldmap' && visiting/)
+  assert.match(navigation, /resolveDuoVisitorFollowAction\(\)[\s\S]*return DUO_VISITOR_FOLLOW_ACTIONS.STAY/)
   assert.doesNotMatch(navigation, /setScreen|setActiveZone|participantId|groupId|unlockedBlock/)
 })
 

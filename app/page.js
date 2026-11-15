@@ -33,7 +33,7 @@ import { FRIEND_ROOM } from '@/lib/interiorFixtures'
 import { INTERIOR_CATALOG, INTERIOR_STARTER_IDS } from '@/lib/interiorCatalog'
 import { getUniquePlacedInteriorIds } from '@/lib/homeHub.mjs'
 import { INTERNAL_BROWSER_QA, TEMPORARILY_UNLOCK_ALL_CONTENT } from '@/lib/temporaryUnlocks'
-import { DUO_VISITOR_FOLLOW_ACTIONS, resolveDuoPresenceScreen, resolveDuoVisitorFollowAction } from '@/lib/duoNavigation.mjs'
+import { DUO_HOME_LOCATION_KEY, readDuoHomeLocation, resolveDuoPresenceScreen, resolveDuoRoomOwnerRole } from '@/lib/duoNavigation.mjs'
 import { buildCatalogExhibitCounts, mergeExhibitCounts } from '@/lib/museumExhibitCounts.mjs'
 import soundMetadata from '@/data/sound_metadata.json'
 
@@ -72,6 +72,18 @@ function readAndScrubDuoInvite() {
     window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`)
   }
   return token
+}
+
+async function recoverDuoHomeLocation(result, clientId) {
+  const saved = readDuoHomeLocation(window.sessionStorage, result.sessionId)
+  if (saved?.kind === 'house') return { screen:'house', visiting:null }
+  if (saved?.kind === 'friend' && saved.ownerRole !== result.role) {
+    const roomResult = await getDuoRoom(result.sessionId, clientId, saved.ownerRole)
+    if (roomResult.ok && roomResult.room) return {
+      screen:'world', visiting:{ sessionId:result.sessionId, ownerRole:saved.ownerRole, room:roomResult.room, fallback:false },
+    }
+  }
+  return { screen:'world', visiting:null }
 }
 
 function duoSessionState(result) {
@@ -196,7 +208,8 @@ export default function HomePage() {
   const [duoSession, setDuoSession] = useState(null)
   const [duoInviteState, setDuoInviteState] = useState({ status:'idle', inviteUrl:'', expiresAt:null, code:null })
   const [duoJoinState, setDuoJoinState] = useState({ status:'idle', code:null })
-  const [duoVisitRoom, setDuoVisitRoom] = useState(null)
+  const [friendVisitState, setFriendVisitState] = useState({ loading:false, error:'' })
+  const friendVisitRequestRef = useRef(0)
   const [hostResumeSessionId, setHostResumeSessionId] = useState(() => (
     duoRecovery?.role === 'host' ? duoRecovery.sessionId
       : typeof window === 'undefined' ? null : window.sessionStorage.getItem('soundvillage-duo-v2-host-session')
@@ -309,25 +322,47 @@ export default function HomePage() {
     return () => window.clearTimeout(id)
   }, [resetEconomy])
 
-  // 집꾸미기 초대 링크(?house=<호스트>)로 들어온 경우 — app/interior-test/page.js가
-  // 검증용으로 먼저 갖고 있던 로직을 실제 앱(루트 경로)에도 그대로 옮긴 것.
-  // InteriorDecorRoom의 초대 링크가 이제 여기(스왑 후 screen==='house')에서
-  // 만들어지므로, 그 링크를 열었을 때 실제로 응답하는 곳도 여기여야 한다 —
-  // 옮기지 않으면 링크가 그냥 평범한 시작 화면으로 떨어져서 초대 기능이
-  // 통째로 죽는다. 호스트가 지금 정확히 월드맵에 있을 때만 실시간 동행
-  // (?duo=)으로 보낸다 — 호스트가 집 안에 있으면(4단계) 굳이 월드맵으로
-  // 우회시키지 않고 바로 아래 방문 화면으로 들어가는데, InteriorDecorRoom이
-  // 방문 모드에서도 같은 duo 채널에 접속해 있으므로 호스트가 집 안에서
-  // 움직이는 걸 그 자리에서 실시간으로 보게 된다. 호스트가 아예 오프라인이면
-  // 저장된 방을 읽기 전용으로 보여준다(기존과 동일) — 이땐 duo 채널에 아무도
-  // 없으니 그냥 조용히 비어 있을 뿐이다.
+  // Saved-room links are read-only. A live invite enters the host's room once;
+  // subsequent room/world navigation belongs to each participant independently.
   const [visiting,      setVisiting]      = useState(null) // null | { token, room }
   const duoScreen = resolveDuoPresenceScreen({ screen, visiting:Boolean(visiting) })
-  const duo = useDuoSession(duoSession, realtimeClientId, duoScreen)
+  const duoRoomOwnerRole = resolveDuoRoomOwnerRole({ screen, visiting, role:duoSession?.role })
+  const duo = useDuoSession(duoSession, realtimeClientId, duoScreen, duoRoomOwnerRole)
   const chat = useDuoChat(duoSession, realtimeClientId)
 
+  useEffect(() => {
+    friendVisitRequestRef.current += 1
+    let active = true
+    queueMicrotask(() => { if (active) setFriendVisitState({ loading:false, error:'' }) })
+    return () => { active = false; friendVisitRequestRef.current += 1 }
+  }, [duoSession?.sessionId])
+
+  useEffect(() => {
+    if (!duoSession?.sessionId) return
+    const location = visiting?.sessionId === duoSession.sessionId && visiting.ownerRole
+      ? { kind:'friend', ownerRole:visiting.ownerRole }
+      : { kind:screen === 'house' && !visiting ? 'house' : 'world' }
+    window.sessionStorage.setItem(DUO_HOME_LOCATION_KEY, JSON.stringify({ sessionId:duoSession.sessionId, ...location }))
+  }, [duoSession?.sessionId, screen, visiting])
+
+  const visitFriendHome = useCallback(async () => {
+    if (!duoSession?.sessionId) return
+    const request = ++friendVisitRequestRef.current
+    const ownerRole = duoSession.role === 'host' ? 'visitor' : 'host'
+    setFriendVisitState({ loading:true, error:'' })
+    const result = await getDuoRoom(duoSession.sessionId, realtimeClientId, ownerRole)
+    if (request !== friendVisitRequestRef.current) return
+    if (!result.ok || !result.room) {
+      setFriendVisitState({ loading:false, error:result.code || 'shared_room_not_found' })
+      return
+    }
+    setFriendVisitState({ loading:false, error:'' })
+    setVisiting({ sessionId:duoSession.sessionId, ownerRole, room:result.room, fallback:false })
+  }, [duoSession, realtimeClientId])
+
   const createLiveDuoInvite = useCallback(async () => {
-    if (!participantId || homePlacedCount < 4 || !['legacy','preview','cutover'].includes(economy.runtimeState)) return
+    // Original furniture gate: if (!participantId || homePlacedCount < 4 || !['legacy','preview','cutover'].includes(economy.runtimeState)) return
+    if (!participantId || !['legacy','preview','cutover'].includes(economy.runtimeState)) return
     setDuoInviteState({ status:'loading', inviteUrl:'', expiresAt:null, code:null })
     const result = await createDuoInvite(realtimeClientId)
     if (!result.ok) {
@@ -350,7 +385,7 @@ export default function HomePage() {
     trackEvent('duo_invite_created', {
       target_type:'duo_session', target_id:'host', outcome:'succeeded',
     }, { critical:true })
-  }, [economy.runtimeState, homePlacedCount, participantId, realtimeClientId])
+  }, [economy.runtimeState, participantId, realtimeClientId])
 
   const closeLiveDuoSession = useCallback(async () => {
     if (!duoSession?.sessionId || duoSession.role !== 'host') return
@@ -361,6 +396,8 @@ export default function HomePage() {
     }
     trackEvent('duo_invite_revoked', { target_type:'duo_session', target_id:'host', outcome:'succeeded' }, { critical:true })
     trackEvent('duo_session_closed', { target_type:'duo_session', target_id:'host', outcome:'succeeded' }, { critical:true })
+    friendVisitRequestRef.current += 1
+    window.sessionStorage.removeItem(DUO_HOME_LOCATION_KEY)
     setDuoSession(null)
     window.sessionStorage.removeItem(DUO_RECOVERY_KEY)
     window.sessionStorage.removeItem('soundvillage-duo-v2-host-session')
@@ -373,9 +410,13 @@ export default function HomePage() {
     if (!hostResumeSessionId || duoSession || duoInviteToken || authRestoring || !participantId) return
     if (!['legacy','preview','cutover'].includes(economy.runtimeState)) return
     let cancelled = false
-    recoverDuo(hostResumeSessionId, realtimeClientId).then((result) => {
+    recoverDuo(hostResumeSessionId, realtimeClientId).then(async (result) => {
       if (cancelled) return
       if (result.ok) {
+        const location = await recoverDuoHomeLocation(result, realtimeClientId)
+        if (cancelled) return
+        setVisiting(location.visiting)
+        setScreen(location.screen)
         setDuoSession(duoSessionState(result))
         setDuoInviteState({ status:'active', inviteUrl:'', expiresAt:result.expiresAt, code:null })
       } else {
@@ -385,6 +426,8 @@ export default function HomePage() {
           setHostResumeSessionId(null)
         }
       }
+    }).catch(() => {
+      if (!cancelled) setDuoInviteState({ status:'error', inviteUrl:'', expiresAt:null, code:'storage_retryable' })
     })
     return () => { cancelled = true }
   }, [authRestoring, duoInviteToken, duoSession, economy.runtimeState, hostResumeSessionId, participantId, realtimeClientId])
@@ -404,18 +447,12 @@ export default function HomePage() {
         }
         return
       }
-      const roomResult = await getDuoRoom(result.sessionId, realtimeClientId)
+      const location = await recoverDuoHomeLocation(result, realtimeClientId)
       if (cancelled) return
       setDuoSession(duoSessionState(result))
       setDuoJoinState({ status:'joined', code:null })
-      if (roomResult.ok && roomResult.room) {
-        setDuoVisitRoom(roomResult.room)
-        setVisiting(null)
-        setScreen('world')
-      } else {
-        setVisiting(null)
-        setScreen('world')
-      }
+      setVisiting(location.visiting)
+      setScreen(location.screen)
     }).catch(() => {
       if (!cancelled) setDuoJoinState({ status:'error', code:'storage_retryable' })
     })
@@ -542,8 +579,7 @@ export default function HomePage() {
       const roomResult = await getDuoRoom(result.sessionId, realtimeClientId)
       if (cancelled) return
       if (roomResult.ok && roomResult.room) {
-        setDuoVisitRoom(roomResult.room)
-        setVisiting({ sessionId:result.sessionId, room:roomResult.room, fallback:false })
+        setVisiting({ sessionId:result.sessionId, ownerRole:'host', room:roomResult.room, fallback:false })
       } else {
         setVisiting(null)
         setScreen('world')
@@ -554,25 +590,6 @@ export default function HomePage() {
     })
     return () => { cancelled = true }
   }, [authRestoring, duoInviteToken, economy.runtimeState, experimentProgress?.isComplete, participantId, realtimeClientId])
-
-  useEffect(() => {
-    if (duoSession?.role !== 'visitor' || !duo.partnerPos?.screen) return
-    const id = window.setTimeout(() => {
-      const action = resolveDuoVisitorFollowAction({
-        role:duoSession.role,
-        peerScreen:duo.partnerPos.screen,
-        visiting:Boolean(visiting),
-        hasSharedRoom:Boolean(duoVisitRoom),
-      })
-      if (action === DUO_VISITOR_FOLLOW_ACTIONS.LEAVE_SHARED_INTERIOR) {
-        setVisiting(null)
-        setScreen('world')
-      } else if (action === DUO_VISITOR_FOLLOW_ACTIONS.ENTER_SHARED_INTERIOR) {
-        setVisiting({ sessionId:duoSession.sessionId, room:duoVisitRoom, fallback:false })
-      }
-    }, 0)
-    return () => window.clearTimeout(id)
-  }, [duo.partnerPos?.screen, duoSession?.role, duoSession?.sessionId, duoVisitRoom, visiting])
 
   useEffect(() => {
     if (!duoSession || !['closed', 'stale'].includes(duo.status)) return
@@ -589,12 +606,12 @@ export default function HomePage() {
       setVisitorResumeSessionId(null)
       setDuoSession(null)
       setDuoJoinState({ status:'closed', code:duo.errorCode || 'session_closed' })
-      if (duoSession.role === 'visitor' && duoVisitRoom) {
-        setVisiting({ sessionId:null, room:duoVisitRoom, fallback:true })
-      }
+      window.sessionStorage.removeItem(DUO_HOME_LOCATION_KEY)
+      setVisiting(current => current?.sessionId === duoSession.sessionId
+        ? { ...current, sessionId:null, ownerRole:null, fallback:true } : current)
     }, 0)
     return () => window.clearTimeout(id)
-  }, [duo.errorCode, duo.status, duoInviteToken, duoSession, duoVisitRoom, realtimeClientId])
+  }, [duo.errorCode, duo.status, duoInviteToken, duoSession, realtimeClientId])
 
   useEffect(() => {
     if (!participantId || localQaRef.current || trackedParticipantRef.current === participantId) return
@@ -798,16 +815,6 @@ export default function HomePage() {
     const participant = await signInMasterSession(password)
     await enterParticipantSession(participant)
   }
-
-  /* ── 집 안에서 방문 중이던 호스트가 다른 화면(주로 월드맵)으로 나갔을 때 —
-     방문객도 그 화면으로 따라간다. URL을 새로고침하지 않으므로 이미 받은
-     참여자ID/그룹을 다시 물어보지 않는다. */
-  const handlePartnerLeftScreen = useCallback(hostScreen => {
-    if (hostScreen !== 'worldmap' || !visiting) return
-    window.history.replaceState(null, '', window.location.pathname)
-    setVisiting(null)
-    setScreen('world')
-  }, [visiting])
 
   /* ── sound_id 포맷 무관하게 메타데이터 소리를 찾는 헬퍼 ── */
   const findSoundByCanonicalId = useCallback((canonicalId, all) => (
@@ -1058,6 +1065,9 @@ export default function HomePage() {
 
   /* ── WorldMap → 우리 집 (ENTER로 진입) ── */
   const handleEnterHouse = useCallback(() => {
+    friendVisitRequestRef.current += 1
+    setFriendVisitState({ loading:false, error:'' })
+    setVisiting(null)
     trackEvent('interior_entered', { target_type: 'building', target_id: 'my-house' })
     setWorldReturnZone(null)
     setScreen('house')
@@ -1065,6 +1075,8 @@ export default function HomePage() {
 
   /* ── 우리 집 → WorldMap (뒤로가기/ESC) — 가구를 샀을 수 있으니 코인 잔액을 새로 읽는다 ── */
   const handleExitHouse = useCallback(() => {
+    friendVisitRequestRef.current += 1
+    setFriendVisitState({ loading:false, error:'' })
     trackEvent('interior_exited', { target_type: 'button', target_id: 'interior-exit' })
     setScreen('world')
     void flushEvents()
@@ -1124,20 +1136,22 @@ export default function HomePage() {
         padding: '24px',
       }}>
         <InteriorDecorRoom
+          key={`visit:${visiting.sessionId || visiting.token || 'saved'}:${visiting.ownerRole || 'shared'}`}
           visitorMode
+          roomOwnerRole={duoRoomOwnerRole}
           visitorName="친구"
           roomShareToken={visiting.token || null}
           duo={duo}
           duoConnectionState={duoJoinState}
           initialRoom={visiting.room}
           onLeaveVisit={() => {
-            // 이미 참여자ID/그룹을 받았으니(handleStart가 screen도 'world'로
-            // 돌려놨다) 다시 물어보지 않고 그대로 내 월드맵으로 넘어간다 —
-            // ?house= 쿼리는 지워서 새로고침해도 방문 판정이 다시 걸리지 않게.
+            // End only the room visit, keeping the Duo/chat session connected.
             window.history.replaceState(null, '', window.location.pathname)
+            friendVisitRequestRef.current += 1
             setVisiting(null)
+            setScreen('house')
           }}
-          onPartnerLeftScreen={handlePartnerLeftScreen}
+          onExit={() => { friendVisitRequestRef.current += 1; setVisiting(null); setScreen('world') }}
           outfitSrc={runtimeOutfitSrc}
           accessorySrc={runtimeAccessorySrc}
           characterLoadout={runtimeCharacterLoadout}
@@ -1313,6 +1327,8 @@ export default function HomePage() {
         padding: '24px',
       }}>
         <InteriorDecorRoom participantId={participantId} initialRoom={worldHomeQaState === 'invite-ready' ? FRIEND_ROOM : undefined} roomShareToken={roomShareToken} roomShareState={roomShareState} onRetryRoomShare={prepareRoomShare}
+          roomOwnerRole={duoRoomOwnerRole}
+          onVisitFriend={duoSession ? visitFriendHome : undefined} friendVisitState={friendVisitState}
           duo={duo} duoInviteState={duoInviteState} onCreateDuoInvite={createLiveDuoInvite} onCloseDuoSession={closeLiveDuoSession}
           outfitSrc={runtimeOutfitSrc} accessorySrc={runtimeAccessorySrc} characterLoadout={runtimeCharacterLoadout}
           dryRun={TEMPORARILY_UNLOCK_ALL_CONTENT || natureQaEnabled || Boolean(humanQaOptions)} onExit={handleExitHouse} onCurrencyChange={refreshCounts} onRoomStatusChange={setHomePlacedCount} />

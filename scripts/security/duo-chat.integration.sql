@@ -1,4 +1,4 @@
--- LOCAL DISPOSABLE SUPABASE ONLY. Run as postgres after 016; all fixtures roll back.
+-- LOCAL DISPOSABLE SUPABASE ONLY. Run as postgres after 019; all fixtures roll back.
 begin;
 do $$
 declare
@@ -44,8 +44,8 @@ begin
   insert into public.chat_messages(session_id,sender_auth_user_id,sender_role,client_message_id,body)
     values(expired,a,'host',gen_random_uuid(),'expired fixture');
   perform public.delete_expired_duo_chat_messages();
-  if exists(select 1 from public.chat_messages where session_id=expired)
-    then raise exception 'expired messages survived'; end if;
+  if not exists(select 1 from public.chat_messages where session_id=expired)
+    then raise exception 'expired chat history was deleted'; end if;
   if not exists(select 1 from public.chat_messages where session_id=s)
     or not exists(select 1 from public.duo_v2_sessions where id=expired)
     or not exists(select 1 from public.study_participants where auth_user_id=a)

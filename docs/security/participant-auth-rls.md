@@ -1,5 +1,11 @@
 # Participant authentication and RLS runbook
 
+## Current device policy after 021
+
+Migration `021_participant_device_handoff.sql` supersedes the fixed-browser/assisted-rebind instructions below for ordinary anonymous participants. An active registered ID and its assigned group are sufficient to hand the participant mapping to a new browser. This is deliberately passwordless; it is not proof that the person knows a secret. The latest claim takes over the mapping and transfers active Duo membership/host identity, releasing the prior tab lease so the existing invitation can be joined again. Gameplay ownership stays on participant_id; historical auth users/logs/chat are retained. The previous browser loses participant authorization. Same-auth concurrent Duo tab checks still apply. MASTER/USER1 and existing non-anonymous email/password accounts retain their dedicated login paths.
+
+The client signs out locally and creates a fresh anonymous identity when switching from another participant ID in the same browser. Never overwrite another participant's row to resolve the unique auth mapping. Apply 018–021 in order before deploying this client change. Node mock tests cover client identity selection; the rollback-only local SQL test `participant-device-handoff.integration.sql` covers handoff, preserved balance/chat, same-link rejoin, old identity detachment and privileged-account protection. SQL/live-device validation was not executed in the implementation environment.
+
 ## Decision
 
 This project uses **Supabase anonymous Auth + an `auth.uid()` participant mapping + RLS**.

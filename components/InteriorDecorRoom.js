@@ -12,6 +12,7 @@ import { getRoom, saveRoom, getOwnedInteriorItems, purchaseInteriorItem, purchas
 import { getEconomyRoom, newEconomyOperationKey, saveEconomyRoom } from '@/lib/economyV1.client'
 import { newOperationKey } from '@/lib/persistenceResult'
 import { inferInteractionMethod, trackEvent } from '@/lib/userEvents'
+import { isSameDuoInterior } from '@/lib/duoNavigation.mjs'
 import { HOME_INVITE_REQUIRED_COUNT, getHomeInviteState, getUniquePlacedInteriorIds } from '@/lib/homeHub.mjs'
 import { useEconomyRuntime } from '@/components/economy-v1/EconomyRuntimeProvider'
 import VillageCostVector, { villageShortages } from '@/components/economy-v1/VillageCostVector'
@@ -416,7 +417,8 @@ export default function InteriorDecorRoom({
   visitorMode = false, visitorName = '친구', roomShareToken, roomShareState = { status:'idle', message:'' }, onRetryRoomShare,
   duo = null, duoInviteState = { status:'idle' }, onCreateDuoInvite, onCloseDuoSession, duoConnectionState,
   onLeaveVisit, onCurrencyChange, onExit,
-  onPartnerLeftScreen, onRoomStatusChange, dryRun = false,
+  roomOwnerRole = null, onVisitFriend, friendVisitState = { loading:false, error:'' },
+  onRoomStatusChange, dryRun = false,
   outfitSrc, accessorySrc, characterLoadout,
 }) {
   const economy = useEconomyRuntime()
@@ -438,18 +440,6 @@ export default function InteriorDecorRoom({
   const duoScreen = 'interior'
   const { partnerPos = null, sendPosition = null, status:duoStatus = 'idle', peerCharacterLoadout = null, peerCharacterStatus = 'idle' } = duo || {}
   const partnerLabel = visitorMode ? visitorName : '방문객'
-
-  // 방문객 전용 — 호스트가 이 방을 나가서 다른 화면(주로 월드맵)으로
-  // 옮겨가면, 방문객은 여기 방 안에 그대로 남아서 더 이상 안 보이던 문제가
-  // 있었다("방에서만 같이 움직여짐"). 호스트의 broadcast screen이 이 방
-  // (duoScreen)과 달라지면 호출부(app/page.js)에 알려서, 그 화면으로 같이
-  // 옮겨가게 한다 — 실제로 어디로 어떻게 옮길지는 호출부가 결정한다.
-  useEffect(() => {
-    if (!visitorMode || !onPartnerLeftScreen) return
-    if (partnerPos && partnerPos.screen && partnerPos.screen !== duoScreen) {
-      onPartnerLeftScreen(partnerPos.screen)
-    }
-  }, [visitorMode, onPartnerLeftScreen, partnerPos, duoScreen])
 
   const [mode, setMode] = useState('view') // 'view' | 'edit' (visitorMode일 땐 항상 읽기 전용으로 취급)
   const [room, setRoom] = useState(() => (visitorMode || dryRun ? deepClone(qaRoom) : null))
@@ -625,7 +615,8 @@ export default function InteriorDecorRoom({
       ? `${window.location.origin}${window.location.pathname}?house=${encodeURIComponent(roomShareToken)}`
       : ''
   const inviteState = getHomeInviteState({ placedCount, shareStatus:roomShareState?.status, shareMessage:roomShareState?.message, inviteUrl })
-  const isReady = inviteState.decorated
+  // Original furniture gate: const isReady = inviteState.decorated
+  const isReady = true
   const readyProgress = inviteState.progress
   const previousInviteReadyRef = useRef(false)
   useEffect(() => {
@@ -1141,6 +1132,9 @@ export default function InteriorDecorRoom({
           {duoConnectionState?.status === 'closed' ? '실시간 세션 종료됨 · 저장된 방을 읽기 전용으로 보고 있어요.' : duoStatus === 'joined' ? '실시간 동행 연결됨' : duoStatus === 'disconnected' ? '연결이 끊겨 다시 연결하는 중…' : duoStatus === 'stale' ? '이 탭의 연결 시간이 만료됐어요.' : duoStatus === 'closed' ? '실시간 세션이 종료됐어요.' : '실시간 동행 연결 중…'}
         </div>
       )}
+      {friendVisitState.error && <div role="alert" style={{ padding:10, background:'#FFF1CC', border:'2px solid var(--text-dark)', fontSize:13 }}>
+        친구 집을 불러오지 못했어요 ({friendVisitState.error}). 잠시 후 다시 시도해주세요.
+      </div>}
       {/* HUD 바 — README 헤더 스펙 중 상점/초대 진입에 필요한 요소만(잔액 pill +
           상점/초대 버튼). 방문 아바타/방 이름/도움말 버튼은 해당 기능이 구현되는
           단계에서 추가한다. visitorMode일 땐 전부 숨기고 구경 중 배지만 보여준다. */}
@@ -1152,6 +1146,7 @@ export default function InteriorDecorRoom({
         {visitorMode ? (
           <div style={{ fontSize: 15, fontFamily: "'Gothic A1', sans-serif", fontWeight: 800 }}>
             🚪 {visitorName}의 방 · 구경 중
+            {onExit && <PixelButton onClick={onExit} style={{ marginLeft:12 }}>월드맵으로</PixelButton>}
           </div>
         ) : (
           <>
@@ -1174,6 +1169,9 @@ export default function InteriorDecorRoom({
                 onClick={(event) => openModal('invite', event.currentTarget)}
                 title={isReady ? inviteState.detail : `가구를 ${HOME_INVITE_REQUIRED_COUNT}개 이상 놓으면 초대할 수 있어요`}
               >{!isReady ? `초대 (${placedCount}/${HOME_INVITE_REQUIRED_COUNT})` : inviteState.id === 'ready' ? '초대' : inviteState.id === 'share-error' ? '초대 링크 확인' : inviteState.id === 'qa-unavailable' ? '초대 미리보기' : '초대 준비 중'}</PixelButton>
+              {onVisitFriend && <PixelButton onClick={onVisitFriend} disabled={isEdit || friendVisitState.loading}>
+                {friendVisitState.loading ? '친구 집 불러오는 중…' : '친구 집 방문'}
+              </PixelButton>}
               <PixelButton tone="accent" disabled={loadError || !mutationsAllowed} onClick={(event) => openModal('shop', event.currentTarget)}>상점</PixelButton>
             </div>
           </>
@@ -1203,7 +1201,7 @@ export default function InteriorDecorRoom({
               inputBlocked={Boolean(modal || reward)}
               duoScreen={duoScreen}
               sendPosition={sendPosition}
-              partnerPos={partnerPos}
+              partnerPos={isSameDuoInterior(roomOwnerRole, partnerPos) ? partnerPos : null}
               partnerLabel={partnerLabel}
               partnerCharacterLoadout={peerCharacterLoadout}
               partnerCharacterStatus={peerCharacterStatus}
@@ -1253,7 +1251,7 @@ export default function InteriorDecorRoom({
                 </div>
               </div>
               <p style={{ margin: '8px 0 0', fontSize: 11, fontFamily: "'Gothic A1', sans-serif", color: 'var(--text-mid)' }}>
-                {inviteState.decorated ? inviteState.detail : `서로 다른 이동 가능 인테리어 ${HOME_INVITE_REQUIRED_COUNT}종을 놓으면 초대 링크를 만들 수 있어요(현재 ${placedCount}종). 같은 상품의 반복 배치는 한 번만 계산해요.`}
+                {inviteState.detail}
               </p>
             </div>
           )}

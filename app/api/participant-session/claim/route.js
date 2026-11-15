@@ -7,6 +7,8 @@ const GROUP_IDS = new Set(['A', 'B'])
 
 const STATUS_HTTP = {
   participant_not_registered: 404,
+  dedicated_sign_in_required: 403,
+  auth_user_already_bound: 409,
   participant_claimed: 409,
   participant_inactive: 403,
   group_mismatch: 409,
