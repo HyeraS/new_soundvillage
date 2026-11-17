@@ -450,6 +450,10 @@ export default function InteriorDecorRoom({
   const [selected, setSelected] = useState(null)
   const [hoverCell, setHoverCell] = useState(null)
   const [toast, setToast] = useState('')
+  const [praising, setPraising] = useState(false)
+  const praiseInFlightRef = useRef(false)
+  const praiseMountedRef = useRef(true)
+  useEffect(() => { praiseMountedRef.current = true; return () => { praiseMountedRef.current = false } }, [])
   const [owned, setOwned] = useState(() => (visitorMode || dryRun ? [...INTERIOR_STARTER_IDS, ...initialOwned] : []))
   const [cat, setCat] = useState('큰가구')
   const [balance, setBalance] = useState(() => (visitorMode || dryRun ? initialBalance : 0))
@@ -629,7 +633,28 @@ export default function InteriorDecorRoom({
     }
     previousInviteReadyRef.current = placedCount >= HOME_INVITE_REQUIRED_COUNT
   }, [onRoomStatusChange, placedCount, placedItemIds])
-  const praiseFriend = useCallback(() => say(`${visitorName}에게 칭찬을 남겼어요`), [say, visitorName])
+  const praiseFriend = useCallback(async () => {
+    if (praiseInFlightRef.current) return
+    if (!visitorMode || !roomOwnerRole || !duo?.sendPraise) {
+      say('실시간 동행 중인 친구 집에서만 칭찬을 보낼 수 있어요')
+      return
+    }
+    praiseInFlightRef.current = true
+    setPraising(true)
+    try {
+      const result = await duo.sendPraise()
+      if (!praiseMountedRef.current) return
+      say(result.ok ? `${visitorName}에게 칭찬을 보냈어요 ♥`
+        : result.code === 'cooldown' ? '잠시 후 다시 칭찬해주세요'
+        : result.code === 'not_confirmed' ? '칭찬 전달을 확인하지 못했어요. 잠시 후 다시 시도해주세요'
+        : '친구와 연결되지 않아 칭찬을 보내지 못했어요')
+    } catch {
+      if (praiseMountedRef.current) say('칭찬을 보내지 못했어요. 다시 시도해주세요')
+    } finally {
+      praiseInFlightRef.current = false
+      if (praiseMountedRef.current) setPraising(false)
+    }
+  }, [visitorMode, roomOwnerRole, duo, say, visitorName])
 
   // isEdit 가드는 여기서 걸지 않는다 — Cozy Room.dc.html의 chooseTool도 가드가
   // 없고, 호출부(보관함 카드 클릭)가 대신 검사한다. 이래야 획득 팝업의
@@ -1216,7 +1241,7 @@ export default function InteriorDecorRoom({
               {visitorMode ? (
                 <>
                   <PixelButton onClick={onLeaveVisit}>내 방으로</PixelButton>
-                  <PixelButton tone="danger" onClick={praiseFriend} style={{ padding: '11px 20px' }}>칭찬 남기기</PixelButton>
+                  <PixelButton tone="danger" onClick={praiseFriend} disabled={praising} style={{ padding: '11px 20px' }}>{praising ? '칭찬 보내는 중…' : '칭찬 남기기'}</PixelButton>
                 </>
               ) : isEdit ? (
                 <>

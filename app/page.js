@@ -21,6 +21,7 @@ import { getEconomyRoom, getEconomySharedRoom, getOrCreateEconomyRoomShare } fro
 import { createDuoInvite, getDuoRoom, heartbeatDuo, joinDuoInvite, recoverDuo, revokeDuo } from '@/lib/duoApi.client'
 import { useDuoSession } from '@/lib/duoSession'
 import DuoChat from '@/components/DuoChat'
+import DuoPraiseNotice from '@/components/DuoPraiseNotice'
 import { useDuoChat } from '@/lib/useDuoChat'
 import { claimParticipantSession, endLocalParticipantSession, restoreParticipantSession, signInMasterSession } from '@/lib/participantAuth'
 import { clearParticipantEntrySession, readParticipantEntrySession, writeParticipantEntrySession } from '@/lib/participantEntrySession.mjs'
@@ -1549,6 +1550,7 @@ export default function HomePage() {
 
   return <>
     {renderGameScreen()}
+    {participantId && duoSession && <DuoPraiseNotice key={duoSession.sessionId} notice={duo.receivedPraise} />}
     {participantId && duoSession && <DuoChat key={duoSession.sessionId} chat={chat} role={duoSession.role} />}
   </>
 }
