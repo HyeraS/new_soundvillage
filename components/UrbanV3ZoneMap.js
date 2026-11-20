@@ -6,7 +6,7 @@ import { CompleteModal, DPad, ExitConfirmModal, PixelChar, ZoneHUD } from '@/com
 import { useWalkFrame } from '@/components/useWalkFrame'
 import { getCharacterRenderMetrics, placeCharacterAtScreenFoot } from '@/lib/characterRenderMetrics.mjs'
 import { spawnUrbanV3SoundItems, URBAN_V3_SOUND_INTERACTION_RADIUS } from '@/lib/urbanV3SoundItems.mjs'
-import { drawVillageCurrencyIcon } from '@/lib/villageCurrencyIconCanvas.mjs'
+import { drawAnnotationMarkerIcon } from '@/lib/villageCurrencyIconCanvas.mjs'
 import {
   PLAYER_FOOT_BOX,
   SPAWN_POINTS,
@@ -49,7 +49,7 @@ function drawMarkers(context, items, blockNum, collectedIds, nearbyId, now) {
       context.fill()
       context.stroke()
     }
-    if (!drawVillageCurrencyIcon(context, 'Urban', x, y, { size: iconSize })) {
+    if (!drawAnnotationMarkerIcon(context, 'Urban', item, x, y, { size: iconSize })) {
       context.beginPath()
       context.fillStyle = collected ? '#66717a' : nearby ? '#fff19a' : '#50e6ff'
       context.strokeStyle = nearby ? '#fff' : '#102a52'
