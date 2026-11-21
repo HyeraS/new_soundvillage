@@ -270,14 +270,6 @@ export default function AnimalZoneMap({
         context.translate(-cameraX, -cameraY)
         context.scale(scaleX, scaleY)
         drawAnimalVillageLayer(context, village, now, playerY / scaleY, 'back')
-        for (const item of items) {
-          if (item.block > blockNumRef.current) continue
-          const collected = collectedIdsRef.current.has(item.id)
-          if (collected) context.globalAlpha = 0.35
-          drawItem(context, item, now)
-          if (collected) context.globalAlpha = 1
-        }
-        drawLockFog(context, sounds, blockNumRef.current, now)
         context.restore()
 
         const foreground = foregroundCanvas.getContext('2d')
@@ -290,6 +282,15 @@ export default function AnimalZoneMap({
         foreground.translate(-cameraX, -cameraY)
         foreground.scale(scaleX, scaleY)
         drawAnimalVillageLayer(foreground, village, now, playerY / scaleY, 'front')
+        // Scenery first, then collectible icons; the player sits above this canvas.
+        for (const item of items) {
+          if (item.block > blockNumRef.current) continue
+          const collected = collectedIdsRef.current.has(item.id)
+          if (collected) foreground.globalAlpha = 0.35
+          drawItem(foreground, item, now)
+          if (collected) foreground.globalAlpha = 1
+        }
+        drawLockFog(foreground, sounds, blockNumRef.current, now)
         if (debugOptions?.mask && village.walkableMask) {
           foreground.save()
           foreground.globalAlpha = 0.28
@@ -387,7 +388,7 @@ export default function AnimalZoneMap({
 
             <div ref={playerWrapRef} data-testid="animal-player" data-frame-index={frameIndex} style={{
               position: 'absolute', left: 0, top: 0, width: SPRITE_W, height: SPRITE_H,
-              transformOrigin: '0 0', pointerEvents: 'none', zIndex: 2,
+              transformOrigin: '0 0', pointerEvents: 'none', zIndex: 4,
             }}>
               <PixelChar dir={dir} moving={moving} frameIndex={frameIndex} outfitSrc={outfitSrc} accessorySrc={accessorySrc} characterLoadout={characterLoadout} />
             </div>
