@@ -5,11 +5,10 @@ import { useCollectiblePromptLogging, useKeys, SPEED } from '@/components/GameEn
 import { PixelChar, ZoneHUD, CompleteModal, ExitConfirmModal, DPad } from '@/components/ZoneMap'
 import {
   T, MAP_W, MAP_H, PLAYER_BOX, MUSIC_PLAYER_SOURCE, MUSIC_PLAYER_W, MUSIC_PLAYER_H,
-  SILHOUETTE_ENTER_RATIO, SILHOUETTE_EXIT_RATIO,
   buildVillage, spawnMusicItems, moveWithCollisionDetailed, overlapsExitTrigger,
   distanceToMusicItem, isMusicItemNearby, terrainSpeedAt, getNavigationTypeAtWorld, getNavigationCellAtWorld,
-  preloadMusicAssets, drawStatic, drawDepthLayer, drawEnvironment, drawNavigationDebug, drawExitCue, markerStateFor,
-  splitOcclusionObjects, getOcclusionState,
+  preloadMusicAssets, drawStatic, drawDepthLayer, drawMarker, drawEnvironment, drawNavigationDebug, drawExitCue, markerStateFor,
+  splitOcclusionObjects,
   getMusicCamera, worldToMusicScreen, getMusicPlayerPlacement,
 } from '@/lib/musicVillage'
 import { getCharacterRenderMetrics } from '@/lib/characterRenderMetrics.mjs'
@@ -44,17 +43,16 @@ export default function MusicZoneMap({
   const canvasRef = useRef(null)
   const behindCanvasRef = useRef(null)
   const frontCanvasRef = useRef(null)
+  const markerCanvasRef = useRef(null)
   const staticCanvasRef = useRef(null)
   const assetsRef = useRef(null)
   const playerWrapRef = useRef(null)
-  const silhouetteWrapRef = useRef(null)
   const debugPanelRef = useRef(null)
   const nearbyMarkerButtonRef = useRef(null)
   const metricsRef = useRef({ cssW: 0, cssH: 0, pixelW: 0, pixelH: 0, dpr: 1 })
   const cameraRef = useRef(null)
   const reducedMotionRef = useRef(false)
   const movementDebugRef = useRef({ blockedAxes: [], collisions: [] })
-  const occlusionStateRef = useRef({ active: false, ratio: 0, objects: [], threshold: SILHOUETTE_ENTER_RATIO })
 
   const posRef = useRef({ x: village.spawn.x, y: village.spawn.y })
   const dirRef = useRef('down')
@@ -114,7 +112,7 @@ export default function MusicZoneMap({
 
   useEffect(() => {
     const stage = stageRef.current
-    const canvases = [canvasRef.current, behindCanvasRef.current, frontCanvasRef.current]
+    const canvases = [canvasRef.current, behindCanvasRef.current, frontCanvasRef.current, markerCanvasRef.current]
     if (!stage || canvases.some((canvas) => !canvas)) return
     const resize = () => {
       const cssW = Math.max(1, Math.round(stage.clientWidth))
@@ -230,9 +228,10 @@ export default function MusicZoneMap({
       const canvas = canvasRef.current
       const behindCanvas = behindCanvasRef.current
       const frontCanvas = frontCanvasRef.current
+      const markerCanvas = markerCanvasRef.current
       const staticCanvas = staticCanvasRef.current
       const metrics = metricsRef.current
-      if (canvas && behindCanvas && frontCanvas && staticCanvas && metrics.pixelW > 0 && metrics.pixelH > 0) {
+      if (canvas && behindCanvas && frontCanvas && markerCanvas && staticCanvas && metrics.pixelW > 0 && metrics.pixelH > 0) {
         const camera = getMusicCamera({
           cssWidth: metrics.cssW,
           cssHeight: metrics.cssH,
@@ -248,8 +247,6 @@ export default function MusicZoneMap({
         const pixelOffsetX = camera.offsetX * metrics.dpr
         const pixelOffsetY = camera.offsetY * metrics.dpr
         const navigationCell = getNavigationCellAtWorld(playerX, playerY - 4)
-        const occlusionState = getOcclusionState(assetsRef.current, playerX, playerY, occlusionStateRef.current.active)
-        occlusionStateRef.current = occlusionState
         const movementDebug = movementDebugRef.current
         const collision = movementDebug.collisions[0] || null
 
@@ -265,10 +262,7 @@ export default function MusicZoneMap({
           stageRef.current.dataset.collisionId = collision?.id || collision?.tag || 'none'
           stageRef.current.dataset.collisionType = collision?.type || 'none'
           stageRef.current.dataset.blockedAxes = movementDebug.blockedAxes.join(',') || 'none'
-          stageRef.current.dataset.occlusionIds = occlusionState.objects.map((entry) => entry.id).join(',') || 'none'
-          stageRef.current.dataset.occlusionRatio = occlusionState.ratio.toFixed(4)
-          stageRef.current.dataset.silhouette = occlusionState.active ? 'true' : 'false'
-          stageRef.current.dataset.silhouetteThreshold = occlusionState.threshold.toFixed(2)
+          stageRef.current.dataset.silhouette = 'false'
           stageRef.current.dataset.debug = debug ? 'true' : 'false'
         }
 
@@ -294,7 +288,6 @@ export default function MusicZoneMap({
         if (debug) drawNavigationDebug(background, {
           player: posRef.current,
           collision: movementDebug,
-          occlusion: occlusionState,
         })
         background.restore()
 
@@ -308,20 +301,27 @@ export default function MusicZoneMap({
           }),
         }))
         const depth = splitOcclusionObjects(playerY)
-        const behindMarkers = markerEntries.filter(({ item }) => (item.ty + .5) * T <= playerY)
-        const frontMarkers = markerEntries.filter(({ item }) => (item.ty + .5) * T > playerY)
-        for (const [depthCanvas, objects, markers] of [
-          [behindCanvas, depth.behind, behindMarkers],
-          [frontCanvas, depth.front, frontMarkers],
+        // Preserve scenery sorting, with markers and the player above both scenery
+        // layers. Rendering order does not change the navigation collision mask.
+        for (const [depthCanvas, objects] of [
+          [behindCanvas, depth.behind],
+          [frontCanvas, depth.front],
         ]) {
           const context = depthCanvas.getContext('2d')
           context.imageSmoothingEnabled = false
           context.clearRect(0, 0, metrics.pixelW, metrics.pixelH)
           context.save()
           applyWorldTransform(context)
-          drawDepthLayer(context, assetsRef.current, objects, markers, now)
+          drawDepthLayer(context, assetsRef.current, objects, [], now)
           context.restore()
         }
+        const markers = markerCanvas.getContext('2d')
+        markers.imageSmoothingEnabled = false
+        markers.clearRect(0, 0, metrics.pixelW, metrics.pixelH)
+        markers.save()
+        applyWorldTransform(markers)
+        for (const { item, state } of markerEntries) drawMarker(markers, item, state, now)
+        markers.restore()
 
         const renderMetrics = getCharacterRenderMetrics({
           stageWidth: metrics.cssW,
@@ -329,7 +329,7 @@ export default function MusicZoneMap({
           sceneCameraScale: camera.scale,
         })
         const placement = getMusicPlayerPlacement(camera, playerX, playerY, renderMetrics)
-        for (const wrapper of [playerWrapRef.current, silhouetteWrapRef.current].filter(Boolean)) {
+        for (const wrapper of [playerWrapRef.current].filter(Boolean)) {
           wrapper.style.left = `${placement.left}px`
           wrapper.style.top = `${placement.top}px`
           wrapper.style.transform = `scale(${renderMetrics.screenScale})`
@@ -340,23 +340,14 @@ export default function MusicZoneMap({
           playerWrapRef.current.dataset.footScreenX = placement.footX.toFixed(2)
           playerWrapRef.current.dataset.footScreenY = placement.footY.toFixed(2)
         }
-        if (silhouetteWrapRef.current) {
-          silhouetteWrapRef.current.style.display = occlusionState.active ? 'block' : 'none'
-          silhouetteWrapRef.current.dataset.occluded = occlusionState.active ? 'true' : 'false'
-          silhouetteWrapRef.current.dataset.ratio = occlusionState.ratio.toFixed(4)
-          silhouetteWrapRef.current.dataset.threshold = occlusionState.threshold.toFixed(2)
-        }
         if (debugPanelRef.current) {
-          const nearby = occlusionState.objects.slice(0, 3).map((entry) => `${entry.id} ${(entry.ratio * 100).toFixed(1)}%`).join('\n') || 'none'
           debugPanelRef.current.textContent = [
             `player foot ${playerX.toFixed(1)},${playerY.toFixed(1)} · ${PLAYER_BOX.w}x${PLAYER_BOX.h}`,
             'movement authority final authored/generated mask',
             `nav [${navigationCell.col},${navigationCell.row}] type=${navigationCell.type}`,
             `movement hit ${collision?.id || collision?.tag || 'none'} (${collision?.type || 'none'})`,
             `blocked axis ${movementDebug.blockedAxes.join(',') || 'none'}`,
-            `occlusion ${nearby}`,
-            `alpha overlap ${(occlusionState.ratio * 100).toFixed(1)}%`,
-            `silhouette ${occlusionState.active ? 'ON' : 'off'} · enter ${(SILHOUETTE_ENTER_RATIO * 100).toFixed(0)}% / exit ${(SILHOUETTE_EXIT_RATIO * 100).toFixed(0)}%`,
+            'render order: scenery → sound markers → player (occlusion disabled)',
           ].join('\n')
         }
 
@@ -389,13 +380,13 @@ export default function MusicZoneMap({
           position: 'absolute', inset: 0, display: 'block', width: '100%', height: '100%',
           imageRendering: 'pixelated', zIndex: 0,
         }} />
-        <canvas ref={behindCanvasRef} aria-label="Music Village objects behind player" style={{
+        <canvas ref={behindCanvasRef} aria-label="Music Village rear scenery" style={{
           position: 'absolute', inset: 0, display: 'block', width: '100%', height: '100%',
           imageRendering: 'pixelated', pointerEvents: 'none', zIndex: 1,
         }} />
         <div ref={playerWrapRef} data-testid="music-player" data-frame-index={frameIndex} style={{
           position: 'absolute', left: 0, top: 0, width: MUSIC_PLAYER_W, height: MUSIC_PLAYER_H,
-          transformOrigin: '0 0', pointerEvents: 'none', zIndex: 2,
+          transformOrigin: '0 0', pointerEvents: 'none', zIndex: 6,
         }}>
           <div aria-hidden="true" style={{
             position: 'absolute', left: (MUSIC_PLAYER_W - 28) / 2, bottom: -3, width: 28, height: 9,
@@ -415,28 +406,14 @@ export default function MusicZoneMap({
             />
           </div>
         </div>
-        <canvas ref={frontCanvasRef} aria-label="Music Village objects in front of player" style={{
+        <canvas ref={frontCanvasRef} aria-label="Music Village front scenery" style={{
           position: 'absolute', inset: 0, display: 'block', width: '100%', height: '100%',
           imageRendering: 'pixelated', pointerEvents: 'none', zIndex: 3,
         }} />
-        <div ref={silhouetteWrapRef} data-testid="music-player-silhouette" data-occluded="false" aria-hidden="true" style={{
-          position: 'absolute', display: 'none', left: 0, top: 0, width: MUSIC_PLAYER_W, height: MUSIC_PLAYER_H,
-          transformOrigin: '0 0', pointerEvents: 'none', zIndex: 4, opacity: .22,
-          filter: 'brightness(0) drop-shadow(1px 0 0 rgba(216,211,255,.75)) drop-shadow(-1px 0 0 rgba(216,211,255,.75))',
-          mixBlendMode: 'multiply',
-        }}>
-          <PixelChar
-            dir={dir}
-            moving={moving}
-            frameIndex={frameIndex}
-            displayWidth={MUSIC_PLAYER_W}
-            displayHeight={MUSIC_PLAYER_H}
-            sourceViewBox={MUSIC_PLAYER_SOURCE}
-            outfitSrc={outfitSrc}
-            accessorySrc={accessorySrc}
-            characterLoadout={characterLoadout}
-          />
-        </div>
+        <canvas ref={markerCanvasRef} aria-label="Music Village sound markers" style={{
+          position: 'absolute', inset: 0, display: 'block', width: '100%', height: '100%',
+          imageRendering: 'pixelated', pointerEvents: 'none', zIndex: 5,
+        }} />
         {debug && (
           <pre ref={debugPanelRef} data-testid="music-debug-panel" style={{
             position: 'absolute', left: 8, top: 8, zIndex: 8, margin: 0,
