@@ -2413,9 +2413,15 @@ function SoundItem({ item, zone, tick, state = 'active' }) {
         data-sound-state={state} transform={`translate(${px}, ${py + bob})`}
         opacity={state === 'active' ? 1 : 0.4}>
         <title>보너스 전사 +50점</title>
+        {state === 'active' && <circle r="19" fill="#ffd54a" opacity={stableFrameValue(.12 + .05 * Math.sin(tick * .04 + item.pulse))} />}
         <image href={VILLAGE_CURRENCY_ICON_SRC[zone] || VILLAGE_CURRENCY_ICON_SRC.Animal}
           x="-14" y="-14" width="28" height="28"
           style={{ imageRendering: 'pixelated', filter: GOLD_ANNOTATION_ICON_FILTER }} />
+        {state === 'active' && [[-10, -10], [11, -3], [1, 12]].map(([x, y], i) => (
+          <path key={i} d="M0 -4 L1 -1 L4 0 L1 1 L0 4 L-1 1 L-4 0 L-1 -1 Z"
+            transform={`translate(${x}, ${y})`} fill="#fff9d6"
+            opacity={stableFrameValue(Math.max(0, Math.sin(tick * .06 + item.pulse + i * 2.1)) ** 2)} />
+        ))}
         {state === 'done' && <path d="M6 -9 L8 -7 L12 -11" stroke="#375b2a" strokeWidth="2" fill="none" />}
       </g>
     )
