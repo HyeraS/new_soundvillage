@@ -514,13 +514,14 @@ assert.match(runtimeSource, /drawNavigationDebug/)
 assert.match(runtimeSource, /foregroundAlphaAt/)
 assert.doesNotMatch(mapSource, /drawForeground\(/, 'single fixed foreground layer was removed')
 assert.match(mapSource, /applyWorldTransform\(background\)/)
-assert.match(mapSource, /applyWorldTransform\(context\)/, 'background, depth objects and markers share a transform')
-assert.match(mapSource, /data-testid="music-player-silhouette"/)
-assert.match(mapSource, /opacity: \.22/)
+assert.match(mapSource, /applyWorldTransform\(context\)/, 'background and markers share a transform')
+assert.match(mapSource, /drawDepthLayer\(ctx, assets, OCCLUSION_OBJECTS, \[\], 0\)/)
+assert.match(mapSource, /aria-label="Music Village sound markers"[\s\S]*?zIndex: 1/)
+assert.match(mapSource, /data-testid="music-player"[\s\S]*?zIndex: 2/)
+assert.doesNotMatch(mapSource, /data-testid="music-player-silhouette"/)
 assert.match(mapSource, /data-testid="music-debug-panel"/)
 assert.match(mapSource, /moveWithCollisionDetailed/)
 assert.match(mapSource, /dataset\.collisionId/)
-assert.match(mapSource, /dataset\.occlusionRatio/)
 assert.match(mapSource, /sourceViewBox=\{MUSIC_PLAYER_SOURCE\}/)
 assert.match(mapSource, /nearbyMarkerButtonRef/)
 assert.match(mapSource, /onClick=\{confirmCollect\}/, 'nearby click uses beginCollect path')
@@ -547,6 +548,6 @@ console.log(JSON.stringify({
     disconnectedWhiteCells: walkableCells - whiteComponentSizes[0],
   },
   collision: { buildings: BUILDINGS.length, blockingProps: BLOCKING_PROP_COLLIDERS.length, explicitColliderWhiteCells: explicitColliderWhiteCells.length, foot: PLAYER_BOX },
-  depth: { objects: OCCLUSION_OBJECTS.length, silhouette: true, enter: SILHOUETTE_ENTER_RATIO, exit: SILHOUETTE_EXIT_RATIO },
+  depth: { backgroundObjects: OCCLUSION_OBJECTS.length, silhouette: false },
   assets: manifest.files.length,
 }, null, 2))

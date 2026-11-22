@@ -271,6 +271,7 @@ export default function AnimalZoneMap({
         context.translate(-cameraX, -cameraY)
         context.scale(scaleX, scaleY)
         drawAnimalVillageLayer(context, village, now, playerY / scaleY, 'back')
+        drawAnimalVillageLayer(context, village, now, playerY / scaleY, 'front')
         for (const item of items) {
           const completed = collectedIdsRef.current.has(item.id)
           if (!completed && item.block > blockNumRef.current) {
@@ -293,7 +294,6 @@ export default function AnimalZoneMap({
         foreground.scale(zoom, zoom)
         foreground.translate(-cameraX, -cameraY)
         foreground.scale(scaleX, scaleY)
-        drawAnimalVillageLayer(foreground, village, now, playerY / scaleY, 'front')
         if (debugOptions?.mask && village.walkableMask) {
           foreground.save()
           foreground.globalAlpha = 0.28

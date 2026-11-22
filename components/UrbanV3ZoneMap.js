@@ -313,10 +313,10 @@ export default function UrbanV3ZoneMap({
       <ZoneHUD zone="Urban" collected={collected} total={total} onExit={onExit} blockNum={blockNum} blockTotal={blockTotal} />
       <div ref={stageRef} data-testid="urban-v3-stage" style={{ position: 'absolute', top: 56, left: 0, right: 0, bottom: 0, overflow: 'hidden' }}>
         <canvas ref={baseCanvasRef} aria-label="Urban V3 production map" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', imageRendering: 'pixelated' }} />
-        <div ref={playerRef} data-testid="urban-v3-player" data-frame-index={frameIndex} style={{ position: 'absolute', left: 0, top: 0, transformOrigin: '0 0', pointerEvents: 'none', zIndex: 2 }}>
+        <div ref={playerRef} data-testid="urban-v3-player" data-frame-index={frameIndex} style={{ position: 'absolute', left: 0, top: 0, transformOrigin: '0 0', pointerEvents: 'none', zIndex: 3 }}>
           <PixelChar dir={dir} moving={moving} frameIndex={frameIndex} outfitSrc={outfitSrc} accessorySrc={accessorySrc} characterLoadout={characterLoadout} />
         </div>
-        <canvas ref={overlayCanvasRef} aria-label="Urban V3 sound markers and collision debug" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', imageRendering: 'pixelated', pointerEvents: 'none', zIndex: 3 }} />
+        <canvas ref={overlayCanvasRef} aria-label="Urban V3 sound markers and collision debug" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', imageRendering: 'pixelated', pointerEvents: 'none', zIndex: 2 }} />
         {!ready && !error && <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: '#eafcff', zIndex: 5 }}>도시 마을 불러오는 중…</div>}
         {error && <div role="alert" style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: '#fff', background: '#260b16', zIndex: 5 }}>{error}</div>}
         {nearby && !isAnnotating && <div style={{ position: 'absolute', left: '50%', bottom: 16, transform: 'translateX(-50%)', zIndex: 5, background: '#07112bee', border: '2px solid #50e6ff', color: '#eafcff', padding: '7px 15px', borderRadius: 6 }}><b>Enter ↵</b> 이 소리 전사하기</div>}

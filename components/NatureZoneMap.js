@@ -54,19 +54,16 @@ export default function NatureZoneMap({ sounds, onCollectSound, onExit, collecte
 
   const stageRef  = useRef(null)
   const canvasRef = useRef(null)
-  const foregroundRef = useRef(null)
 
   useEffect(() => {
     const stage = stageRef.current
     const canvas = canvasRef.current
-    const foreground = foregroundRef.current
-    if (!stage || !canvas || !foreground) return
+    if (!stage || !canvas) return
     const resize = () => {
       const w = Math.round(stage.clientWidth)
       const h = Math.round(stage.clientHeight)
       if (canvas.width !== w) canvas.width = w
       if (canvas.height !== h) canvas.height = h
-      if (foreground.width !== w) foreground.width = w
       if (foreground.height !== h) foreground.height = h
     }
     resize()
@@ -243,6 +240,7 @@ export default function NatureZoneMap({ sounds, onCollectSound, onExit, collecte
         ctx.translate(-camX, -camY)
         ctx.scale(scaleX, scaleY)
         ctx.drawImage(off, 0, 0)
+        if (village.foregroundCanvas) ctx.drawImage(village.foregroundCanvas, 0, 0)
         if (debugCollision && village.assets.walkableMask) {
           ctx.save()
           ctx.globalAlpha = 0.28
@@ -285,20 +283,6 @@ export default function NatureZoneMap({ sounds, onCollectSound, onExit, collecte
           }
         }
         ctx.restore()
-
-        const foreground = foregroundRef.current
-        if (foreground && village.foregroundCanvas) {
-          const fg = foreground.getContext('2d')
-          fg.imageSmoothingEnabled = false
-          fg.clearRect(0, 0, foreground.width, foreground.height)
-          fg.save()
-          fg.translate(offsetX, offsetY)
-          fg.scale(zoom, zoom)
-          fg.translate(-camX, -camY)
-          fg.scale(scaleX, scaleY)
-          fg.drawImage(village.foregroundCanvas, 0, 0)
-          fg.restore()
-        }
       }
 
       if (playerWrapRef.current) {
@@ -362,9 +346,6 @@ export default function NatureZoneMap({ sounds, onCollectSound, onExit, collecte
                 <PixelChar dir={dir} moving={moving} frameIndex={frameIndex} outfitSrc={outfitSrc} accessorySrc={accessorySrc} characterLoadout={characterLoadout} />
               </div>
             )}
-
-            <canvas ref={foregroundRef} aria-hidden="true"
-              style={{ display: 'block', position: 'absolute', inset: 0, width: '100%', height: '100%', imageRendering: 'pixelated', pointerEvents: 'none', zIndex: 3 }} />
 
             {collecting && !isAnnotating && !debugStaticArt && (
               <div style={{

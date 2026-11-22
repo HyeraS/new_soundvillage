@@ -129,7 +129,7 @@ export default function LabZoneMap({ sounds, onCollectSound, onExit, collectedId
      const basePosition=currentPointToBase(r.pos,r.village.transform)
      const camera={...labCamera(viewport.width,viewport.height,basePosition),dpr:viewport.dpr}
      const renderItems=r.items.map(item=>({...item,...currentPointToBase(item,r.village.transform)}))
-     renderLabScene(back.getContext('2d'),front.getContext('2d'),loaded,renderItems,basePosition,now,l.blockNum,l.collectedIds,camera,r.selected?.id||null)
+     renderLabScene(back.getContext('2d'),front.getContext('2d'),loaded,renderItems,now,l.blockNum,l.collectedIds,camera,r.selected?.id||null)
      if(debugCollision&&loaded.walkableMask){
        const overlay=front.getContext('2d');overlay.save();overlay.globalAlpha=.28;overlay.drawImage(loaded.walkableMask,0,0,r.village.baseWorldWidth,r.village.baseWorldHeight);overlay.restore()
        overlay.save();overlay.strokeStyle='#fff45c';overlay.lineWidth=2/camera.zoom;overlay.strokeRect(basePosition.x-10,basePosition.y-14,20,14);overlay.restore()

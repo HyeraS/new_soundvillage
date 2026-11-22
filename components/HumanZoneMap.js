@@ -6,7 +6,7 @@ import { PixelChar, ZoneHUD, CompleteModal, ExitConfirmModal, DPad, SPRITE_W, SP
 import {
   T, MAP_W, MAP_H, PLAYER_BOX, INTERACTION_BOX, HUMAN_LAYER_Z,
   loadHumanVillage, spawnHumanItems, moveWithCollision, overlapsExitTrigger,
-  drawHumanObjects, drawHumanMarker, drawHumanExitCue,
+  drawHumanMarker, drawHumanExitCue,
   drawHumanDebug, markerStateFor,
 } from '@/lib/humanVillage'
 import { getCharacterRenderMetrics, placeCharacterAtScreenFoot } from '@/lib/characterRenderMetrics.mjs'
@@ -50,7 +50,6 @@ export default function HumanZoneMap({
 
   const stageRef = useRef(null)
   const canvasRef = useRef(null)
-  const foregroundCanvasRef = useRef(null)
   const markerCanvasRef = useRef(null)
   const playerWrapRef = useRef(null)
   const metricsRef = useRef({ cssW: 0, cssH: 0, pixelW: 0, pixelH: 0 })
@@ -119,7 +118,7 @@ export default function HumanZoneMap({
 
   useEffect(() => {
     const stage = stageRef.current
-    const canvases = [canvasRef.current, foregroundCanvasRef.current, markerCanvasRef.current]
+    const canvases = [canvasRef.current, markerCanvasRef.current]
     if (!stage || canvases.some((canvas) => !canvas)) return
     const resize = () => {
       const cssW = Math.max(1, Math.round(stage.clientWidth))
@@ -269,10 +268,9 @@ export default function HumanZoneMap({
       inExitZoneRef.current = inExitZone
 
       const canvas = canvasRef.current
-      const foregroundCanvas = foregroundCanvasRef.current
       const markerCanvas = markerCanvasRef.current
       const metrics = metricsRef.current
-      if (canvas && foregroundCanvas && markerCanvas && metrics.pixelW > 0 && metrics.pixelH > 0) {
+      if (canvas && markerCanvas && metrics.pixelW > 0 && metrics.pixelH > 0) {
         const fullMap = debugOverview || staticArt
         const worldWidth = village.currentWorldWidth
         const worldHeight = village.currentWorldHeight
@@ -307,16 +305,9 @@ export default function HumanZoneMap({
         setupWorld(background)
         background.drawImage(village.staticCanvas, 0, 0)
         if (!staticArt) {
-          drawHumanObjects(background, village.assets, playerY / scaleY, 'below')
           drawHumanExitCue(background, now)
         }
         background.restore()
-
-        const foreground = foregroundCanvas.getContext('2d')
-        foreground.clearRect(0, 0, metrics.pixelW, metrics.pixelH)
-        setupWorld(foreground)
-        if (!staticArt) drawHumanObjects(foreground, village.assets, playerY / scaleY, 'above')
-        foreground.restore()
 
         const markers = markerCanvas.getContext('2d')
         markers.imageSmoothingEnabled = false
@@ -409,7 +400,6 @@ export default function HumanZoneMap({
         <div ref={playerWrapRef} data-human-player data-character-moving={moving ? 'true' : 'false'} data-frame-index={frameIndex} style={{ position: 'absolute', left: 0, top: 0, width: SPRITE_W, height: SPRITE_H, transformOrigin: '0 0', pointerEvents: 'none', zIndex: HUMAN_LAYER_Z.player }}>
           <PixelChar dir={dir} moving={moving} frameIndex={frameIndex} outfitSrc={outfitSrc} accessorySrc={accessorySrc} characterLoadout={characterLoadout} />
         </div>
-        <canvas ref={foregroundCanvasRef} aria-label="Human Village foreground" style={{ position: 'absolute', inset: 0, display: 'block', width: '100%', height: '100%', imageRendering: 'pixelated', pointerEvents: 'none', zIndex: HUMAN_LAYER_Z.foreground }} />
         {!village && !loadError && <div style={statusStyle}>사람 마을을 준비하고 있어요…</div>}
         {loadError && <div style={statusStyle}>사람 마을 에셋을 불러오지 못했어요.<br />{loadError}</div>}
         {!staticArt && collecting && !isAnnotating && (
