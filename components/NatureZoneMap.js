@@ -2,11 +2,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { useCollectiblePromptLogging, useKeys, SPEED, overlaps, TILE } from '@/components/GameEngine'
 import { PixelChar, ZoneHUD, CompleteModal, ExitConfirmModal, DPad, SPRITE_W, SPRITE_H } from '@/components/ZoneMap'
+import { drawLockedSoundMarker } from '@/lib/lockedSoundMarkerCanvas.mjs'
 import { useWalkFrame } from '@/components/useWalkFrame'
 import {
   T,
   loadNatureVillage, moveWithCollision, spawnNatureItems,
-  drawOrb, drawWaterShimmers, drawLockFog, PLAYER_BOX,
+  drawOrb, drawWaterShimmers, PLAYER_BOX,
 } from '@/lib/natureVillage'
 import { getVillageRuntimeManifest } from '@/lib/villageRuntimeManifest.mjs'
 
@@ -272,13 +273,16 @@ export default function NatureZoneMap({ sounds, onCollectSound, onExit, collecte
 
         if (!debugStaticArt) {
           for (const item of items) {
-            if (item.block > blockNumRef.current) continue
-            const done = collectedIdsRef.current.has(item.id)
-            if (done) ctx.globalAlpha = 0.35
+            const completed = collectedIdsRef.current.has(item.id)
+            if (!completed && item.block > blockNumRef.current) {
+              drawLockedSoundMarker(ctx, item.tx * T + T / 2, item.ty * T + T / 2)
+              continue
+            }
+            ctx.save()
+            if (completed) ctx.globalAlpha *= 0.38
             drawOrb(ctx, item, now)
-            if (done) ctx.globalAlpha = 1
+            ctx.restore()
           }
-          drawLockFog(ctx, sounds, blockNumRef.current, now)
         }
         ctx.restore()
 

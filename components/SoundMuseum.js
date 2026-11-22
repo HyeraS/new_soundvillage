@@ -391,7 +391,7 @@ function Shop({ participantId, onCurrencyChange }) {
           operation_idempotency_key: result.idempotencyKey, error_code: result.error?.code || result.reason || 'purchase_failed',
           metadata: { retryable: result.error?.retryable, price_displayed: price, price_confirmed: result.price, balance: result.balance },
         }, { critical: true, flush: true })
-        if (result.reason === 'insufficient_funds') setNotice('잔액이 부족해요 🪙')
+        if (result.reason === 'insufficient_funds') setNotice('잔액이 부족해요 ♪')
         else if (result.reason === 'already_owned') { setNotice('이미 보유 중인 아이템이에요'); await refresh() }
         else setNotice('구매 중 오류가 발생했어요. 다시 시도해주세요.')
         if (!result.error?.retryable) purchaseKeys.current.delete(product.id)

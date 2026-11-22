@@ -5,9 +5,10 @@ import { PixelChar, ZoneHUD, CompleteModal, ExitConfirmModal, DPad, SPRITE_W, SP
 import {
   T, BASE_MAP_SRC,
   loadAnimalVillage, moveWithCollision, spawnAnimalItems,
-  drawItem, drawLockFog, drawAnimalVillageLayer, drawAnimalDebug, PLAYER_BOX,
+  drawItem, drawAnimalVillageLayer, drawAnimalDebug, PLAYER_BOX,
 } from '@/lib/animalVillage'
 import { getCharacterRenderMetrics, placeCharacterAtScreenFoot } from '@/lib/characterRenderMetrics.mjs'
+import { drawLockedSoundMarker } from '@/lib/lockedSoundMarkerCanvas.mjs'
 import { useWalkFrame } from '@/components/useWalkFrame'
 import { getVillageRuntimeManifest } from '@/lib/villageRuntimeManifest.mjs'
 
@@ -271,13 +272,16 @@ export default function AnimalZoneMap({
         context.scale(scaleX, scaleY)
         drawAnimalVillageLayer(context, village, now, playerY / scaleY, 'back')
         for (const item of items) {
-          if (item.block > blockNumRef.current) continue
-          const collected = collectedIdsRef.current.has(item.id)
-          if (collected) context.globalAlpha = 0.35
+          const completed = collectedIdsRef.current.has(item.id)
+          if (!completed && item.block > blockNumRef.current) {
+            drawLockedSoundMarker(context, item.tx * T + T / 2, item.ty * T + T / 2)
+            continue
+          }
+          context.save()
+          if (completed) context.globalAlpha *= 0.38
           drawItem(context, item, now)
-          if (collected) context.globalAlpha = 1
+          context.restore()
         }
-        drawLockFog(context, sounds, blockNumRef.current, now)
         context.restore()
 
         const foreground = foregroundCanvas.getContext('2d')

@@ -6,7 +6,7 @@ import { PixelChar, ZoneHUD, CompleteModal, ExitConfirmModal, DPad, SPRITE_W, SP
 import {
   T, MAP_W, MAP_H, PLAYER_BOX, INTERACTION_BOX, HUMAN_LAYER_Z,
   loadHumanVillage, spawnHumanItems, moveWithCollision, overlapsExitTrigger,
-  drawHumanObjects, drawHumanMarker, drawHumanLockFog, drawHumanExitCue,
+  drawHumanObjects, drawHumanMarker, drawHumanExitCue,
   drawHumanDebug, markerStateFor,
 } from '@/lib/humanVillage'
 import { getCharacterRenderMetrics, placeCharacterAtScreenFoot } from '@/lib/characterRenderMetrics.mjs'
@@ -153,7 +153,7 @@ export default function HumanZoneMap({
     const delta = { up: [0, -SPEED], down: [0, SPEED], left: [-SPEED, 0], right: [SPEED, 0] }[direction]
     if (!delta) return
     posRef.current = moveWithCollision(currentVillage, posRef.current,
-      delta[0] * currentVillage.transform.scaleX, delta[1] * currentVillage.transform.scaleY, blockNumRef.current)
+      delta[0] * currentVillage.transform.scaleX, delta[1] * currentVillage.transform.scaleY)
   }, [])
 
   const pressDirection = useCallback((direction, interactionMethod) => {
@@ -209,7 +209,7 @@ export default function HumanZoneMap({
       let moved = false
       if (hasMovementInput) {
         const previousPosition = posRef.current
-        const nextPosition = moveWithCollision(village, previousPosition, dx, dy, blockNumRef.current)
+        const nextPosition = moveWithCollision(village, previousPosition, dx, dy)
         moved = Math.abs(nextPosition.x - previousPosition.x) > 0.01 || Math.abs(nextPosition.y - previousPosition.y) > 0.01
         posRef.current = nextPosition
         if (nextDir && nextDir !== dirRef.current) { dirRef.current = nextDir; setDir(nextDir) }
@@ -307,7 +307,6 @@ export default function HumanZoneMap({
         setupWorld(background)
         background.drawImage(village.staticCanvas, 0, 0)
         if (!staticArt) {
-          drawHumanLockFog(background, blockNumRef.current, now)
           drawHumanObjects(background, village.assets, playerY / scaleY, 'below')
           drawHumanExitCue(background, now)
         }

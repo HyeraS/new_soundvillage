@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useKeys, SPEED } from '@/components/GameEngine'
 import { PixelChar, ZoneHUD, DPad, CompleteModal, ExitConfirmModal } from '@/components/ZoneMap'
-import { buildVillage, spawnLabItems, moveWithCollision, overlapsExit, canCollect, regionProgress } from '@/lib/labVillageConfig.mjs'
+import { buildVillage, spawnLabItems, moveWithCollision, overlapsExit, canCollect } from '@/lib/labVillageConfig.mjs'
 import { loadLabVillage, renderLabScene, labCamera } from '@/lib/labVillage'
 import styles from './LabZoneMap.module.css'
 import { trackEvent } from '@/lib/userEvents'
@@ -40,7 +40,7 @@ export default function LabZoneMap({ sounds, onCollectSound, onExit, collectedId
    loadLabVillage().then(assets=>{
      if(cancelled)return
      const r=runtime.current
-     r.village={...village,regionProgress:regionProgress(sounds)}
+     r.village=village
      const baseVillage=buildVillage(sounds)
      r.items=spawnLabItems(sounds,baseVillage).map(item=>({...item,...basePointToCurrent(item,village.transform)}))
      r.pos=debugStart&&Number.isFinite(debugStart.x)&&Number.isFinite(debugStart.y)
@@ -104,7 +104,7 @@ export default function LabZoneMap({ sounds, onCollectSound, onExit, collectedId
        const hasMovementInput=dx!==0||dy!==0
        const norm=Math.hypot(dx,dy)||1,next=moveWithCollision(r.village,r.pos,
          dx/norm*SPEED*dt*r.village.transform.scaleX,
-         dy/norm*SPEED*dt*r.village.transform.scaleY,l.blockNum)
+         dy/norm*SPEED*dt*r.village.transform.scaleY)
        r.moving=Math.hypot(next.x-r.pos.x,next.y-r.pos.y)>.01;r.pos=next;r.dir=dir
        const interactionScale=Math.max(r.village.transform.scaleX,r.village.transform.scaleY)
        if(r.ignore){const item=r.items.find(i=>i.id===r.ignore);if(!item||Math.hypot(item.x-r.pos.x,item.y-r.pos.y)>54*interactionScale)r.ignore=null}
@@ -129,7 +129,7 @@ export default function LabZoneMap({ sounds, onCollectSound, onExit, collectedId
      const basePosition=currentPointToBase(r.pos,r.village.transform)
      const camera={...labCamera(viewport.width,viewport.height,basePosition),dpr:viewport.dpr}
      const renderItems=r.items.map(item=>({...item,...currentPointToBase(item,r.village.transform)}))
-     renderLabScene(back.getContext('2d'),front.getContext('2d'),loaded,renderItems,basePosition,now,l.blockNum,l.collectedIds,camera,r.village.regionProgress,r.selected?.id||null)
+     renderLabScene(back.getContext('2d'),front.getContext('2d'),loaded,renderItems,basePosition,now,l.blockNum,l.collectedIds,camera,r.selected?.id||null)
      if(debugCollision&&loaded.walkableMask){
        const overlay=front.getContext('2d');overlay.save();overlay.globalAlpha=.28;overlay.drawImage(loaded.walkableMask,0,0,r.village.baseWorldWidth,r.village.baseWorldHeight);overlay.restore()
        overlay.save();overlay.strokeStyle='#fff45c';overlay.lineWidth=2/camera.zoom;overlay.strokeRect(basePosition.x-10,basePosition.y-14,20,14);overlay.restore()

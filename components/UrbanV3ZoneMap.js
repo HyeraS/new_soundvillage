@@ -6,6 +6,7 @@ import { CompleteModal, DPad, ExitConfirmModal, PixelChar, ZoneHUD } from '@/com
 import { useWalkFrame } from '@/components/useWalkFrame'
 import { getCharacterRenderMetrics, placeCharacterAtScreenFoot } from '@/lib/characterRenderMetrics.mjs'
 import { spawnUrbanV3SoundItems, URBAN_V3_SOUND_INTERACTION_RADIUS } from '@/lib/urbanV3SoundItems.mjs'
+import { drawLockedSoundMarker } from '@/lib/lockedSoundMarkerCanvas.mjs'
 import { drawVillageCurrencyIcon } from '@/lib/villageCurrencyIconCanvas.mjs'
 import {
   PLAYER_FOOT_BOX,
@@ -37,9 +38,13 @@ function drawMarkers(context, items, blockNum, collectedIds, nearbyId, now) {
     const pulse = nearby ? 1.5 + Math.sin(now / 130 + item.phase) * 1.5 : 0
     const x = item.x
     const y = item.y - 9
+    if (!unlocked && !collected) {
+      drawLockedSoundMarker(context, x, y)
+      continue
+    }
     const iconSize = nearby ? 28 : 24
     context.save()
-    context.globalAlpha = unlocked ? collected ? 0.38 : 1 : 0.28
+    context.globalAlpha = collected ? 0.38 : 1
     if (nearby) {
       context.fillStyle = '#50e6ff33'
       context.strokeStyle = '#fff19a'
@@ -62,7 +67,6 @@ function drawMarkers(context, items, blockNum, collectedIds, nearbyId, now) {
       context.font = 'bold 12px sans-serif'
       context.fillText(collected ? '✓' : '♪', x, y)
     } else if (collected) {
-      context.globalAlpha = unlocked ? 0.9 : 0.38
       context.strokeStyle = '#fff'
       context.lineWidth = 2
       context.beginPath()
@@ -101,7 +105,7 @@ export default function UrbanV3ZoneMap({
   const items = useMemo(() => spawnUrbanV3SoundItems(sounds).map((item) => Object.freeze({
     ...item, ...basePointToCurrent(item, transform),
   })), [sounds, transform])
-  const spawn = useMemo(() => debugStart && Number.isFinite(debugStart.x) && Number.isFinite(debugStart.y)
+  const { x: spawnX, y: spawnY } = useMemo(() => debugStart && Number.isFinite(debugStart.x) && Number.isFinite(debugStart.y)
     ? basePointToCurrent(debugStart, transform)
     : debugFirstItem && items[0]
       ? { x: items[0].x, y: items[0].y }
@@ -112,13 +116,14 @@ export default function UrbanV3ZoneMap({
   const playerRef = useRef(null)
   const assetsRef = useRef(null)
   const metricsRef = useRef({ width: 1, height: 1, dpr: 1 })
-  const positionRef = useRef(spawn)
+  const positionRef = useRef({ x: spawnX, y: spawnY })
   const itemsRef = useRef(items)
   const collectedRef = useRef(collectedIds)
   const blockRef = useRef(blockNum)
   const annotatingRef = useRef(isAnnotating)
   const nearbyRef = useRef(null)
   const exitRef = useRef(false)
+  const exitConfirmRef = useRef(false)
   const [ready, setReady] = useState(false)
   const [error, setError] = useState('')
   const [nearby, setNearby] = useState(null)
@@ -134,7 +139,8 @@ export default function UrbanV3ZoneMap({
   useEffect(() => { collectedRef.current = collectedIds }, [collectedIds])
   useEffect(() => { blockRef.current = blockNum }, [blockNum])
   useEffect(() => { annotatingRef.current = isAnnotating }, [isAnnotating])
-  useEffect(() => { positionRef.current = spawn }, [spawn])
+  useEffect(() => { exitConfirmRef.current = exitConfirm }, [exitConfirm])
+  useEffect(() => { positionRef.current = { x: spawnX, y: spawnY } }, [spawnX, spawnY])
 
   useEffect(() => {
     let cancelled = false
@@ -195,7 +201,7 @@ export default function UrbanV3ZoneMap({
       let dx = 0
       let dy = 0
       let nextDir = null
-      if (!annotatingRef.current && !exitRef.current) {
+      if (!annotatingRef.current && !exitConfirmRef.current) {
         if (pressed.up) { dy -= BASE_SPEED * dt * transform.scaleY; nextDir = 'up' }
         if (pressed.down) { dy += BASE_SPEED * dt * transform.scaleY; nextDir = 'down' }
         if (pressed.left) { dx -= BASE_SPEED * dt * transform.scaleX; nextDir = 'left' }
@@ -317,7 +323,7 @@ export default function UrbanV3ZoneMap({
       </div>
       <DPad press={press} release={release} onExit={onExit} onConfirm={nearby ? collectNearby : null} />
       {total > 0 && collected === total && <CompleteModal zone="Urban" onExit={onExit} />}
-      {exitConfirm && <ExitConfirmModal zone="Urban" onConfirm={onExit} onCancel={() => { exitRef.current = false; setExitConfirm(false) }} />}
+      {exitConfirm && <ExitConfirmModal zone="Urban" onConfirm={onExit} onCancel={() => setExitConfirm(false)} />}
     </div>
   )
 }

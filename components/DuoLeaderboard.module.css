@@ -1,0 +1,95 @@
+.leaderboard {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 250;
+  width: min(318px, calc(100vw - 32px));
+  color: #3a2a14;
+  font-family: Nunito, sans-serif;
+  text-align: right;
+  pointer-events: none;
+}
+
+.worldMap {
+  bottom: 158px;
+}
+
+.toggle,
+.panel {
+  border: 2px solid #c8a96e;
+  border-radius: 12px;
+  background: #f5edd8;
+  pointer-events: auto;
+}
+
+.toggle {
+  padding: 10px 12px;
+  color: inherit;
+  cursor: pointer;
+}
+
+.panel,
+.notice {
+  padding: 10px 12px;
+  text-align: left;
+  box-shadow: 0 4px 24px #0003;
+}
+
+.panel {
+  margin-top: 8px;
+  max-height: min(370px, 45dvh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.notice {
+  margin-bottom: 8px;
+  border: 2px solid #c8a96e;
+  border-radius: 10px;
+  background: #fff1cc;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.status {
+  margin: 0 0 8px;
+  font-size: 12px;
+}
+
+.villages {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.village {
+  padding: 7px;
+  border: 1px solid #c8a96e80;
+  border-radius: 8px;
+  background: #fff9ed;
+  font-size: 12px;
+}
+
+.village h3 {
+  margin: 0 0 4px;
+  font-size: inherit;
+}
+
+.village ol {
+  margin: 0;
+  padding-left: 16px;
+}
+
+.village li + li {
+  margin-top: 2px;
+}
+
+.village strong {
+  float: right;
+  margin-left: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.name {
+  overflow-wrap: anywhere;
+}

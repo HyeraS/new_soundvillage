@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback, useLayoutEffect, useRef } from 'react'
+import { useState, useEffect, useCallback, useLayoutEffect, useMemo, useRef } from 'react'
 import StartPanel      from '@/components/StartPanel'
 import WorldMap        from '@/components/WorldMap'
 import ZoneMap         from '@/components/ZoneMap'
@@ -21,8 +21,10 @@ import { getEconomyRoom, getEconomySharedRoom, getOrCreateEconomyRoomShare } fro
 import { createDuoInvite, getDuoRoom, heartbeatDuo, joinDuoInvite, recoverDuo, revokeDuo } from '@/lib/duoApi.client'
 import { useDuoSession } from '@/lib/duoSession'
 import DuoChat from '@/components/DuoChat'
+import DuoLeaderboard from '@/components/DuoLeaderboard'
 import DuoPraiseNotice from '@/components/DuoPraiseNotice'
 import { useDuoChat } from '@/lib/useDuoChat'
+import { normalizeDuoProgress } from '@/lib/duoProgress.mjs'
 import { claimParticipantSession, endLocalParticipantSession, restoreParticipantSession, signInMasterSession } from '@/lib/participantAuth'
 import { clearParticipantEntrySession, readParticipantEntrySession, writeParticipantEntrySession } from '@/lib/participantEntrySession.mjs'
 import { OUTFIT_SHEETS } from '@/components/AssetRegistry'
@@ -328,8 +330,13 @@ export default function HomePage() {
   const [visiting,      setVisiting]      = useState(null) // null | { token, room }
   const duoScreen = resolveDuoPresenceScreen({ screen, visiting:Boolean(visiting) })
   const duoRoomOwnerRole = resolveDuoRoomOwnerRole({ screen, visiting, role:duoSession?.role })
-  const duo = useDuoSession(duoSession, realtimeClientId, duoScreen, duoRoomOwnerRole)
+  const duoZoneCounts = experimentProgress?.zoneCounts
+  const duoProgress = useMemo(() => normalizeDuoProgress(participantId, { zoneCounts:duoZoneCounts }), [participantId, duoZoneCounts])
+  const duo = useDuoSession(duoSession, realtimeClientId, duoScreen, duoRoomOwnerRole, duoProgress)
+  const { sendProgressMilestone } = duo
   const chat = useDuoChat(duoSession, realtimeClientId)
+  const [openLeaderboardSession, setOpenLeaderboardSession] = useState(null)
+  const leaderboardOpen = Boolean(duoSession && openLeaderboardSession === duoSession.sessionId && !chat.open)
 
   useEffect(() => {
     friendVisitRequestRef.current += 1
@@ -663,6 +670,10 @@ export default function HomePage() {
   const studyAccessGroup   = getStudyAccessGroup(participantId)
   const effectiveGroupId   = studyAccessGroup || groupId
   const bypassGroupFilter  = studyAccessEnabled && !studyAccessGroup
+  const activeZoneSounds = useMemo(
+    () => getGroupSounds(activeZone, effectiveGroupId, bypassGroupFilter),
+    [activeZone, effectiveGroupId, bypassGroupFilter],
+  )
   // 원격 진척도를 기다리는 동안에도 카탈로그의 실제 배정 개수는 즉시 표시한다.
   // 정상 인증 경로에서는 아래 값을 원격 progress 결과가 덮어쓴다.
   const exhibitZoneCounts = mergeExhibitCounts(
@@ -1005,6 +1016,7 @@ export default function HomePage() {
   /* ── AnnotationPanel Stage1 완료 → Zone 복귀 + 블록 완료 체크 ── */
   const handleAnnotateComplete = useCallback(({ persistence } = {}) => {
     applyEconomyActivityResult(persistence)
+    sendProgressMilestone(activeZone, persistence, participantId)
     const newCollected = new Set([...collectedIds, ...(activeSound ? [activeSound.sound_id] : [])])
     setCollectedIds(newCollected)
 
@@ -1043,7 +1055,7 @@ export default function HomePage() {
       setScreen('zone')
     }
     refreshCounts()
-  }, [activeSound, activeZone, collectedIds, effectiveGroupId, bypassGroupFilter, unlockedBlock, villagesUnlocked, refreshCounts, setUnlockedBlock, applyEconomyActivityResult])
+  }, [activeSound, activeZone, collectedIds, effectiveGroupId, bypassGroupFilter, unlockedBlock, villagesUnlocked, refreshCounts, setUnlockedBlock, applyEconomyActivityResult, sendProgressMilestone, participantId])
 
   /* ── SoundMuseum 완료 → WorldMap 복귀 (+ "오늘은 여기까지" 토스트) ── */
   const handleMuseumDone = useCallback(() => {
@@ -1307,7 +1319,7 @@ export default function HomePage() {
                 📅 출석 완료! 연속 {attendanceToast.streakDay}일차
               </div>
               <div style={{ fontSize:'11px', color:'#8B6A3A', lineHeight:1.5 }}>
-                +{attendanceToast.reward}🪙 획득했어요
+                +{attendanceToast.reward}♪ 획득했어요
               </div>
             </div>
           </div>
@@ -1369,7 +1381,7 @@ export default function HomePage() {
   // 5. Zone 내부 맵 (+ annotation 오버레이)
   if (screen === 'zone' || screen === 'annotate') {
     const currentBlock = unlockedBlock[activeZone] || 1
-    const zoneSounds   = getGroupSounds(activeZone, effectiveGroupId, bypassGroupFilter)
+    const zoneSounds   = activeZoneSounds
     const maxBlock     = zoneSounds.reduce((m, s) => Math.max(m, s.block || 1), 1)
     const zoneInputBlocked = screen === 'annotate' || showFeedback || Boolean(blockUnlockInfo)
     return (
@@ -1550,7 +1562,14 @@ export default function HomePage() {
 
   return <>
     {renderGameScreen()}
-    {participantId && duoSession && <DuoPraiseNotice key={duoSession.sessionId} notice={duo.receivedPraise} />}
-    {participantId && duoSession && <DuoChat key={duoSession.sessionId} chat={chat} role={duoSession.role} />}
+    {participantId && duoSession && <DuoPraiseNotice key={`praise:${duoSession.sessionId}`} notice={duo.receivedPraise} />}
+    {participantId && duoSession && <DuoChat key={`chat:${duoSession.sessionId}`} role={duoSession.role}
+      chat={{ ...chat, toggle:() => { setOpenLeaderboardSession(null); chat.toggle() } }} />}
+    {participantId && duoSession && <DuoLeaderboard key={`leaderboard:${duoSession.sessionId}`}
+      self={duoProgress} peer={duo.peerProgress} notices={duo.progressNotices}
+      open={leaderboardOpen} worldMap={screen === 'world'} onToggle={() => {
+        if (chat.open) chat.toggle()
+        setOpenLeaderboardSession(leaderboardOpen ? null : duoSession.sessionId)
+      }} />}
   </>
 }
