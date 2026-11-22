@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import styles from './DuoChat.module.css'
 
-export default function DuoChat({ chat, role }) {
+export default function DuoChat({ chat, role, leaderboardOpen = false }) {
   const [draft, setDraft] = useState('')
   const hasUnread = !chat.open && !chat.expired && chat.unread > 0
   const bottom = useRef(null)
@@ -22,7 +23,8 @@ export default function DuoChat({ chat, role }) {
       style={{ background:hasUnread ? '#FFF1CC' : '#F5EDD8', border:`2px solid ${hasUnread ? '#B85C38' : '#C8A96E'}`, borderRadius:12, padding:'10px 16px', cursor:'pointer' }}>
       동행 채팅 {chat.open ? '접기' : '열기'}{hasUnread && <span style={{ marginLeft:8, background:'#B84332', color:'#fff', borderRadius:12, padding:'2px 7px', fontWeight:800 }}>{chat.unread}</span>}
     </button>
-    {chat.open && <section id="duo-chat-panel" style={{ marginTop:8, background:'#F5EDD8', border:'2px solid #C8A96E', borderRadius:12, padding:12, boxShadow:'0 4px 24px #0003' }}>
+    {chat.open && <section id="duo-chat-panel" className={leaderboardOpen ? styles.withLeaderboard : undefined}
+      style={{ marginTop:8, background:'#F5EDD8', border:'2px solid #C8A96E', borderRadius:12, padding:12, boxShadow:'0 4px 24px #0003' }}>
       <p role="status" style={{ margin:'0 0 8px', fontSize:12 }}>{chat.expired ? '세션이 종료되어 채팅을 사용할 수 없어요.' : chat.connected ? '현재 초대 세션의 대화' : '채팅 연결 중…'}</p>
       <div role="log" aria-label="대화 내용" aria-live="polite" style={{ height:'min(260px, 35dvh)', overflowY:'auto', overflowWrap:'anywhere' }}>
         {!chat.messages.length && !chat.expired && <p style={{ fontSize:13 }}>동행 친구에게 메시지를 보내보세요.</p>}

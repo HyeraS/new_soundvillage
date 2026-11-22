@@ -336,7 +336,7 @@ export default function HomePage() {
   const { sendProgressMilestone } = duo
   const chat = useDuoChat(duoSession, realtimeClientId)
   const [openLeaderboardSession, setOpenLeaderboardSession] = useState(null)
-  const leaderboardOpen = Boolean(duoSession && openLeaderboardSession === duoSession.sessionId && !chat.open)
+  const leaderboardOpen = Boolean(duoSession && openLeaderboardSession === duoSession.sessionId)
 
   useEffect(() => {
     friendVisitRequestRef.current += 1
@@ -1563,13 +1563,11 @@ export default function HomePage() {
   return <>
     {renderGameScreen()}
     {participantId && duoSession && <DuoPraiseNotice key={`praise:${duoSession.sessionId}`} notice={duo.receivedPraise} />}
-    {participantId && duoSession && <DuoChat key={`chat:${duoSession.sessionId}`} role={duoSession.role}
-      chat={{ ...chat, toggle:() => { setOpenLeaderboardSession(null); chat.toggle() } }} />}
+    {participantId && duoSession && <DuoChat key={`chat:${duoSession.sessionId}`} role={duoSession.role} chat={chat}
+      leaderboardOpen={leaderboardOpen} />}
     {participantId && duoSession && <DuoLeaderboard key={`leaderboard:${duoSession.sessionId}`}
       self={duoProgress} peer={duo.peerProgress} notices={duo.progressNotices}
-      open={leaderboardOpen} worldMap={screen === 'world'} onToggle={() => {
-        if (chat.open) chat.toggle()
-        setOpenLeaderboardSession(leaderboardOpen ? null : duoSession.sessionId)
-      }} />}
+      open={leaderboardOpen} worldMap={screen === 'world'}
+      onToggle={() => setOpenLeaderboardSession(current => current === duoSession.sessionId ? null : duoSession.sessionId)} />}
   </>
 }
