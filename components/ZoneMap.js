@@ -3,8 +3,6 @@ import { useEffect, useRef, useState, useMemo, memo } from 'react'
 import { useCollectiblePromptLogging, useKeys, TILE, SPEED, ZONE_META, overlaps } from '@/components/GameEngine'
 import { TILES, OBJECTS, CHARACTERS, ITEMS, ASSET_READY, ZONE_GROUND_TILE, WORLD_CHARACTER, WORLD_TILESET, WORLD_ANIMALS, WORLD_FARM_BUILDINGS, WORLD_PRODUCE, WORLD_PROPS, ANIMAL_ZONE_TILESET, WORLD_NATURE, NATURE_VILLAGE_TILESET, URBAN_KENNEY_GROUND, URBAN_KENNEY_BUILDING, URBAN_KENNEY_VEHICLES, URBAN_KENNEY_TREES, URBAN_KENNEY_PROPS, URBAN_KENNEY_PEDESTRIANS, URBAN_SOUND_ICONS, HUMAN_WINTER_GROUND, WINTER_TILES, WINTER_MARKET, resolveWorldCharacterLayers } from '@/components/AssetRegistry'
 import { SHEET_CODES, LAB_DUNGEON_SHEET_META, LAB_STATIC, LAB_TORCHES, LAB_TRAPS, LAB_PROPS, LAB_ANIM, LAB_FLOOR_CELLS } from '@/components/labDungeonData'
-import { VILLAGE_CURRENCY_ICON_SRC, GOLD_ANNOTATION_ICON_FILTER } from '@/lib/villageCurrencyIconCanvas.mjs'
-import { isBonusAnnotationCategory } from '@/lib/annotationBonus.mjs'
 import { useWalkFrame } from '@/components/useWalkFrame'
 
 /* ─────────────────────────────────────────────
@@ -2405,27 +2403,6 @@ function SoundItem({ item, zone, tick, state = 'active' }) {
   const imgSrc = items[item.index % items.length]
   const hasProduce = zone === 'Animal' || zone === 'Nature' || zone === 'Urban'
   const stableFrameValue = value => Number(value.toFixed(4))
-
-  if (isBonusAnnotationCategory(item.sound?.sub_category)) {
-    const bob = state === 'active' ? stableFrameValue(Math.sin(tick * 0.06 + item.pulse) * 4) : 0
-    return (
-      <g data-sound-item-id={item.id} data-sound-tx={item.tx} data-sound-ty={item.ty}
-        data-sound-state={state} transform={`translate(${px}, ${py + bob})`}
-        opacity={state === 'active' ? 1 : 0.4}>
-        <title>보너스 전사 +50점</title>
-        {state === 'active' && <circle r="19" fill="#ffd54a" opacity={stableFrameValue(.12 + .05 * Math.sin(tick * .04 + item.pulse))} />}
-        <image href={VILLAGE_CURRENCY_ICON_SRC[zone] || VILLAGE_CURRENCY_ICON_SRC.Animal}
-          x="-14" y="-14" width="28" height="28"
-          style={{ imageRendering: 'pixelated', filter: GOLD_ANNOTATION_ICON_FILTER }} />
-        {state === 'active' && [[-10, -10], [11, -3], [1, 12]].map(([x, y], i) => (
-          <path key={i} d="M0 -4 L1 -1 L4 0 L1 1 L0 4 L-1 1 L-4 0 L-1 -1 Z"
-            transform={`translate(${x}, ${y})`} fill="#fff9d6"
-            opacity={stableFrameValue(Math.max(0, Math.sin(tick * .06 + item.pulse + i * 2.1)) ** 2)} />
-        ))}
-        {state === 'done' && <path d="M6 -9 L8 -7 L12 -11" stroke="#375b2a" strokeWidth="2" fill="none" />}
-      </g>
-    )
-  }
 
   // 잠긴(아직 구역 해제 안 된) 아이템 — 실제 아이콘을 옅게 보여줘 어디에
   // 분포되어 있는지는 알 수 있게 하되, 흐림 효과 자체는 구역 전체를 덮는
