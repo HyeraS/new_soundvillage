@@ -64,7 +64,6 @@ export default function NatureZoneMap({ sounds, onCollectSound, onExit, collecte
       const h = Math.round(stage.clientHeight)
       if (canvas.width !== w) canvas.width = w
       if (canvas.height !== h) canvas.height = h
-      if (foreground.height !== h) foreground.height = h
     }
     resize()
     const ro = new ResizeObserver(resize)
