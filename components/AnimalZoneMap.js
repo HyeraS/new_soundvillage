@@ -391,7 +391,7 @@ export default function AnimalZoneMap({
 
             <div ref={playerWrapRef} data-testid="animal-player" data-frame-index={frameIndex} style={{
               position: 'absolute', left: 0, top: 0, width: SPRITE_W, height: SPRITE_H,
-              transformOrigin: '0 0', pointerEvents: 'none', zIndex: 2,
+              transformOrigin: '0 0', pointerEvents: 'none', zIndex: 4,
             }}>
               <PixelChar dir={dir} moving={moving} frameIndex={frameIndex} outfitSrc={outfitSrc} accessorySrc={accessorySrc} characterLoadout={characterLoadout} />
             </div>
