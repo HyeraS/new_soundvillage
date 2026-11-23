@@ -5,7 +5,6 @@ import { playSound, stopSound, seekTo, getCurrentTime, getListeningTime, resetAu
 import { saveAnnotation } from '@/lib/supabase';
 import { newOperationKey } from '@/lib/persistenceResult';
 import { rewardEventFields } from '@/lib/economyRuntimeState.mjs';
-import { isBonusAnnotationCategory, BONUS_ANNOTATION_POINTS } from '@/lib/annotationBonus.mjs';
 import { trackEvent } from '@/lib/userEvents';
 
 /* ─────────────────────────────────────────────
@@ -524,11 +523,6 @@ function Stage1Panel({ sound, zone, palette, participantId, sessionId, economyMo
           <div style={{ fontSize: '10px', color: '#6B6660', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {sound.sub_category ? `${sound.sub_category} · ` : ''}{sound.sound_id}
           </div>
-          {isBonusAnnotationCategory(sound.sub_category) && (
-            <div style={{ color: '#85550a', background: '#fff0b3', borderRadius: '6px', padding: '3px 7px', marginTop: '4px', fontSize: '11px', fontWeight: 700 }}>
-              보너스 전사 +{BONUS_ANNOTATION_POINTS}점
-            </div>
-          )}
         </div>
         {playCount > 0 && (
           <div style={{ fontSize: '10px', color: '#6B6660', flexShrink: 0 }}>{playCount}회 재생</div>
