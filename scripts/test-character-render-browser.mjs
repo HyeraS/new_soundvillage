@@ -447,27 +447,23 @@ async function runTransitionMatrix(browser) {
           const villagePath = path.join(outputDir, `${loadoutName}-${viewport.width}x${viewport.height}-${zone.toLowerCase()}-village.png`)
           await page.screenshot({ path: villagePath })
 
-          let musicOcclusion = null
+          let musicLayerOrder = null
           if (zone === 'Music') {
-            const silhouette = page.locator('[data-testid="music-player-silhouette"]')
-            await page.addStyleTag({ content: '[data-testid="music-player-silhouette"] { display: block !important; }' })
-            await page.waitForTimeout(100)
-            await injectLoadout(silhouette, loadoutName)
-            const silhouetteMetrics = await measureCharacter(silhouette, loadoutName)
-            assertSceneMatchesNature(village, silhouetteMetrics, `${label} silhouette`)
-            const frontZ = await page.locator('canvas[aria-label="Music Village objects in front of player"]').evaluate((element) => getComputedStyle(element).zIndex)
-            const playerZ = await zoneLocator.evaluate((element) => getComputedStyle(element).zIndex)
-            const silhouetteZ = await silhouette.evaluate((element) => getComputedStyle(element).zIndex)
-            assert.equal(Number(playerZ), 2)
-            assert.equal(Number(frontZ), 3)
-            assert.equal(Number(silhouetteZ), 4)
+            const stage = page.getByTestId('music-stage')
+            const layerZ = locator => locator.evaluate(element => Number(getComputedStyle(element).zIndex))
+            const backgroundZ = await layerZ(stage.getByLabel('Music Village production map'))
+            const markerZ = await layerZ(stage.getByLabel('Music Village sound markers'))
+            const playerZ = await layerZ(zoneLocator)
+            assert.ok(backgroundZ < markerZ && markerZ < playerZ, `${label} world layer order`)
+            assert.equal(await stage.getByTestId('music-player-silhouette').count(), 0)
+            assert.equal(await zoneLocator.evaluate(element => getComputedStyle(element).opacity), '1')
             const shadow = await zoneLocator.locator('div[aria-hidden="true"]').first().evaluate((element) => {
               const rect = element.getBoundingClientRect()
               return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, height: rect.height }
             })
             const shadowCenterError = Math.abs((shadow.left + shadow.right) / 2 - village.gameplayFoot.x)
             assert.ok(shadowCenterError <= 1, `${label} shadow center error ${shadowCenterError}`)
-            musicOcclusion = { silhouette: silhouetteMetrics, frontZ, playerZ, silhouetteZ, shadow, shadowCenterError }
+            musicLayerOrder = { backgroundZ, markerZ, playerZ, shadow, shadowCenterError }
           }
 
           results.push({
@@ -477,7 +473,7 @@ async function runTransitionMatrix(browser) {
             world,
             village,
             errors: { world: worldErrors, village: villageErrors, scene: sceneErrors },
-            musicOcclusion,
+            musicLayerOrder,
             screenshots: { world: worldPath, village: villagePath },
           })
           assertNoDiagnostics(record)

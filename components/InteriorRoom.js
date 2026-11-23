@@ -15,6 +15,7 @@ export const COLS = 12, ROWS = 5, CELL = 64, ROWD = 48, WALL_ROWS = 2, WALL_ROWD
 export const STAGE_W = COLS * CELL       // 768
 export const STAGE_H = WALL_H + ROWS * ROWD // 464
 const AVATAR_NATIVE = 32 // avatar.png 원본 픽셀 크기(32x32)
+const ROOM_RIGHT_EDGE_INSET = 16
 
 function InteriorCharacter({ direction, moving = false, animationTick = 0, outfitSrc, accessorySrc, characterLoadout, scale }) {
   if (!characterLoadout) return null
@@ -181,6 +182,7 @@ export default function InteriorRoom({
      좌우 이동 시 좌우 반전만 적용한다.
   ───────────────────────────────────────────── */
   const AVATAR_W = AVATAR_NATIVE * S, AVATAR_H = AVATAR_NATIVE * S
+  const stageRef = useRef(null)
   const [avatarPos, setAvatarPos] = useState({ x: 2 * CELL + 8, y: 2 })
   const [avatarDirection, setAvatarDirection] = useState('right')
   const [avatarMoving, setAvatarMoving] = useState(false)
@@ -198,7 +200,31 @@ export default function InteriorRoom({
   }, [avatarMoving, partnerPos?.moving])
 
   useEffect(() => {
-    const maxX = STAGE_W - AVATAR_W
+    const stage = stageRef.current
+    const viewport = stage.parentElement
+    let minX = 0
+    let maxX = 0
+    const updateHorizontalBounds = () => {
+      const stageLeft = stage.getBoundingClientRect().left + stage.clientLeft
+      const viewportLeft = viewport.getBoundingClientRect().left + viewport.clientLeft
+      const visualViewport = window.visualViewport
+      const screenLeft = visualViewport?.offsetLeft ?? 0
+      const screenRight = screenLeft + (visualViewport?.width ?? document.documentElement.clientWidth)
+      const visibleLeft = Math.max(stageLeft, viewportLeft, screenLeft)
+      const visibleRight = Math.min(stageLeft + stage.clientWidth, viewportLeft + viewport.clientWidth, screenRight)
+      const roomMaxX = Math.max(0, stage.clientWidth - AVATAR_W)
+      const rightInset = Math.min(ROOM_RIGHT_EDGE_INSET, Math.max(0, visibleRight - visibleLeft - AVATAR_W))
+      minX = Math.min(roomMaxX, visibleLeft - stageLeft)
+      maxX = Math.max(minX, visibleRight - stageLeft - AVATAR_W - rightInset)
+    }
+    updateHorizontalBounds()
+    const observer = new ResizeObserver(updateHorizontalBounds)
+    observer.observe(viewport)
+    observer.observe(stage)
+    viewport.addEventListener('scroll', updateHorizontalBounds)
+    window.addEventListener('resize', updateHorizontalBounds)
+    window.visualViewport?.addEventListener('resize', updateHorizontalBounds)
+    window.visualViewport?.addEventListener('scroll', updateHorizontalBounds)
     const maxY = ROWS * ROWD - 24
     let rafId
     let last = performance.now()
@@ -206,30 +232,39 @@ export default function InteriorRoom({
       const dt = Math.min((now - last) / 16.67, 3)
       last = now
       const k = keys.current
-      let { x, y } = avatarPosRef.current
+      const { x: previousX, y: previousY } = avatarPosRef.current
       let dx = 0, dy = 0
       if (k.up) dy += SPEED * dt
       if (k.down) dy -= SPEED * dt
       if (k.left) dx -= SPEED * dt
       if (k.right) dx += SPEED * dt
-      let moved = false
+      const visibleX = Math.max(minX, Math.min(maxX, previousX))
+      const x = Math.max(minX, Math.min(maxX, visibleX + dx))
+      const y = Math.max(0, Math.min(maxY, previousY + dy))
+      const moved = x !== visibleX || y !== previousY
       let nextDirection = avatarDirectionRef.current
       if (dx || dy) {
-        x = Math.max(0, Math.min(maxX, x + dx))
-        y = Math.max(0, Math.min(maxY, y + dy))
         nextDirection = Math.abs(dx) >= Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : (dy < 0 ? 'down' : 'up')
         setAvatarDirection(nextDirection)
         avatarDirectionRef.current = nextDirection
+      }
+      if (x !== previousX || y !== previousY) {
         avatarPosRef.current = { x, y }
         setAvatarPos({ x, y })
-        moved = true
       }
       setAvatarMoving(moved)
       if (duoScreen) sendPosition?.(x, y, nextDirection, duoScreen, moved)
       rafId = requestAnimationFrame(loop)
     }
     rafId = requestAnimationFrame(loop)
-    return () => cancelAnimationFrame(rafId)
+    return () => {
+      cancelAnimationFrame(rafId)
+      observer.disconnect()
+      viewport.removeEventListener('scroll', updateHorizontalBounds)
+      window.removeEventListener('resize', updateHorizontalBounds)
+      window.visualViewport?.removeEventListener('resize', updateHorizontalBounds)
+      window.visualViewport?.removeEventListener('scroll', updateHorizontalBounds)
+    }
   }, [keys, AVATAR_W, duoScreen, sendPosition])
 
   // 발밑(bottom) 위치로 어느 줄에 있는지 추정해, 그 줄 가구와 같은 규칙(row*10+5)
@@ -238,7 +273,7 @@ export default function InteriorRoom({
   const avatarZIndex = avatarRow * 10 + 6
 
   return (
-      <div style={{
+      <div ref={stageRef} style={{
         position: 'relative', isolation: 'isolate', zIndex: 0,
         width: STAGE_W, height: STAGE_H, margin: '0 auto',
         overflow: 'hidden', border: '3px solid var(--text-dark)', background: '#CBB79B',

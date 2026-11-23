@@ -375,7 +375,6 @@ export default function CharacterStudioPanel({
     <header className={styles.header}>
       <div><small>CHARACTER STYLE STUDIO</small><h2>내 캐릭터 스타일링</h2></div>
       {environment === 'qa' && <span className={styles.qaBadge} data-testid="studio-qa-notice">QA dry-run · 실제 저장 없음</span>}
-      {environment === 'legacy' && <span className={styles.environmentBadge}>기존 경제</span>}
     </header>
 
     {status === 'loading' && <div className={styles.statePanel} role="status">상품과 착용 정보를 불러오는 중이에요…</div>}
@@ -410,7 +409,7 @@ export default function CharacterStudioPanel({
           {tab === 'identity'
           ? <div className={styles.freeIdentityNotice}>{identityIsLocalOnly ? '무료 외형 QA 미리보기 · 네트워크 요청 및 실제 저장 없음' : '무료 기본 외형 · 저장해도 화폐가 차감되지 않아요'}</div>
           : environment === 'legacy'
-          ? <div className={styles.legacyWallet} aria-label={`보유 화폐 ${legacyBalance}개`}><span>보유 화폐</span><strong>🪙 {Number(legacyBalance).toLocaleString('ko-KR')}</strong></div>
+          ? <div className={styles.legacyWallet} aria-label={`보유 화폐 ${legacyBalance}개`}><span>보유 화폐</span><strong>♪ {Number(legacyBalance).toLocaleString('ko-KR')}</strong></div>
           : <VillageWalletBar balances={balances}/>
         }
         {notice && <p className={notice.kind === 'error' ? styles.errorNotice : styles.notice} role={notice.kind === 'error' ? 'alert' : 'status'} aria-live="polite">{notice.text}</p>}
@@ -470,7 +469,7 @@ export default function CharacterStudioPanel({
                 <div className={styles.cardBody}>
                   <div><strong>{item.name}</strong><span>{isOwned ? '보유 중' : '구매 전 미리보기 가능'}</span></div>
                   {item.id !== 'basic' && (environment === 'legacy'
-                    ? <p className={styles.legacyPrice}>🪙 {item.legacyPrice}{legacyMissing > 0 && <small>{legacyMissing}개 부족</small>}</p>
+                    ? <p className={styles.legacyPrice}>♪ {item.legacyPrice}{legacyMissing > 0 && <small>{legacyMissing}개 부족</small>}</p>
                     : <VillageCostVector cost={item.cost} balances={balances}/>)}
                   <button
                     type="button"
@@ -505,7 +504,7 @@ export default function CharacterStudioPanel({
         <h2 id="studio-purchase-title">{purchaseItem.name}</h2>
         <p id="studio-purchase-description">지금 왼쪽 캐릭터가 이 상품을 미리 착용하고 있어요. 아래 화폐를 차감하며, 구매 후 바로 장착됩니다.</p>
         {environment === 'legacy'
-          ? <div className={styles.dialogLegacyPrice}>차감될 화폐 <strong>🪙 {purchaseItem.legacyPrice}</strong></div>
+          ? <div className={styles.dialogLegacyPrice}>차감될 화폐 <strong>♪ {purchaseItem.legacyPrice}</strong></div>
           : <VillageCostVector cost={purchaseItem.cost} balances={balances} showExpected/>}
         {dialogError && <p id="studio-purchase-error" className={styles.dialogError} role="alert">{dialogError}</p>}
         <div className={styles.dialogActions}>

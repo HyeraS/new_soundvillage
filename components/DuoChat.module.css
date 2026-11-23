@@ -1,0 +1,7 @@
+@media (max-width: 740px), (max-height: 460px) {
+  .withLeaderboard {
+    max-height: 38dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}

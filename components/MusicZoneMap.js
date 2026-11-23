@@ -9,6 +9,10 @@ import {
   distanceToMusicItem, isMusicItemNearby, terrainSpeedAt, getNavigationTypeAtWorld, getNavigationCellAtWorld,
   preloadMusicAssets, drawStatic, drawDepthLayer, drawMarker, drawEnvironment, drawNavigationDebug, drawExitCue, markerStateFor,
   splitOcclusionObjects,
+  OCCLUSION_OBJECTS,
+  buildVillage, spawnMusicItems, moveWithCollisionDetailed, overlapsExitTrigger,
+  distanceToMusicItem, isMusicItemNearby, terrainSpeedAt, getNavigationTypeAtWorld, getNavigationCellAtWorld,
+  preloadMusicAssets, drawStatic, drawDepthLayer, drawMarker, drawEnvironment, drawNavigationDebug, drawExitCue, markerStateFor,
   getMusicCamera, worldToMusicScreen, getMusicPlayerPlacement,
 } from '@/lib/musicVillage'
 import { getCharacterRenderMetrics } from '@/lib/characterRenderMetrics.mjs'
@@ -41,11 +45,8 @@ export default function MusicZoneMap({
 
   const stageRef = useRef(null)
   const canvasRef = useRef(null)
-  const behindCanvasRef = useRef(null)
-  const frontCanvasRef = useRef(null)
   const markerCanvasRef = useRef(null)
   const staticCanvasRef = useRef(null)
-  const assetsRef = useRef(null)
   const playerWrapRef = useRef(null)
   const debugPanelRef = useRef(null)
   const nearbyMarkerButtonRef = useRef(null)
@@ -103,8 +104,8 @@ export default function MusicZoneMap({
     preloadMusicAssets().then((assets) => {
       if (cancelled) return
       drawStatic(ctx, village, assets)
+      drawDepthLayer(ctx, assets, OCCLUSION_OBJECTS, [], 0)
       staticCanvasRef.current = offscreen
-      assetsRef.current = assets
       setAssetStatus(assets.failed.length ? 'partial' : 'ready')
     })
     return () => { cancelled = true }
@@ -112,7 +113,7 @@ export default function MusicZoneMap({
 
   useEffect(() => {
     const stage = stageRef.current
-    const canvases = [canvasRef.current, behindCanvasRef.current, frontCanvasRef.current, markerCanvasRef.current]
+    const canvases = [canvasRef.current, markerCanvasRef.current]
     if (!stage || canvases.some((canvas) => !canvas)) return
     const resize = () => {
       const cssW = Math.max(1, Math.round(stage.clientWidth))
@@ -226,12 +227,10 @@ export default function MusicZoneMap({
       inExitZoneRef.current = inExitZone
 
       const canvas = canvasRef.current
-      const behindCanvas = behindCanvasRef.current
-      const frontCanvas = frontCanvasRef.current
       const markerCanvas = markerCanvasRef.current
       const staticCanvas = staticCanvasRef.current
       const metrics = metricsRef.current
-      if (canvas && behindCanvas && frontCanvas && markerCanvas && staticCanvas && metrics.pixelW > 0 && metrics.pixelH > 0) {
+      if (canvas && markerCanvas && staticCanvas && metrics.pixelW > 0 && metrics.pixelH > 0) {
         const camera = getMusicCamera({
           cssWidth: metrics.cssW,
           cssHeight: metrics.cssH,
@@ -262,7 +261,6 @@ export default function MusicZoneMap({
           stageRef.current.dataset.collisionId = collision?.id || collision?.tag || 'none'
           stageRef.current.dataset.collisionType = collision?.type || 'none'
           stageRef.current.dataset.blockedAxes = movementDebug.blockedAxes.join(',') || 'none'
-          stageRef.current.dataset.silhouette = 'false'
           stageRef.current.dataset.debug = debug ? 'true' : 'false'
         }
 
@@ -300,28 +298,13 @@ export default function MusicZoneMap({
             interactingId: isAnnotatingRef.current ? interactingItemIdRef.current : null,
           }),
         }))
-        const depth = splitOcclusionObjects(playerY)
-        // Preserve scenery sorting, with markers and the player above both scenery
-        // layers. Rendering order does not change the navigation collision mask.
-        for (const [depthCanvas, objects] of [
-          [behindCanvas, depth.behind],
-          [frontCanvas, depth.front],
-        ]) {
-          const context = depthCanvas.getContext('2d')
-          context.imageSmoothingEnabled = false
-          context.clearRect(0, 0, metrics.pixelW, metrics.pixelH)
-          context.save()
-          applyWorldTransform(context)
-          drawDepthLayer(context, assetsRef.current, objects, [], now)
-          context.restore()
-        }
-        const markers = markerCanvas.getContext('2d')
-        markers.imageSmoothingEnabled = false
-        markers.clearRect(0, 0, metrics.pixelW, metrics.pixelH)
-        markers.save()
-        applyWorldTransform(markers)
-        for (const { item, state } of markerEntries) drawMarker(markers, item, state, now)
-        markers.restore()
+        const context = markerCanvas.getContext('2d')
+        context.imageSmoothingEnabled = false
+        context.clearRect(0, 0, metrics.pixelW, metrics.pixelH)
+        context.save()
+        applyWorldTransform(context)
+        for (const { item, state } of markerEntries) drawMarker(context, item, state, now)
+        context.restore()
 
         const renderMetrics = getCharacterRenderMetrics({
           stageWidth: metrics.cssW,
@@ -329,12 +312,10 @@ export default function MusicZoneMap({
           sceneCameraScale: camera.scale,
         })
         const placement = getMusicPlayerPlacement(camera, playerX, playerY, renderMetrics)
-        for (const wrapper of [playerWrapRef.current].filter(Boolean)) {
-          wrapper.style.left = `${placement.left}px`
-          wrapper.style.top = `${placement.top}px`
-          wrapper.style.transform = `scale(${renderMetrics.screenScale})`
-        }
         if (playerWrapRef.current) {
+          playerWrapRef.current.style.left = `${placement.left}px`
+          playerWrapRef.current.style.top = `${placement.top}px`
+          playerWrapRef.current.style.transform = `scale(${renderMetrics.screenScale})`
           playerWrapRef.current.dataset.worldX = playerX.toFixed(2)
           playerWrapRef.current.dataset.worldY = playerY.toFixed(2)
           playerWrapRef.current.dataset.footScreenX = placement.footX.toFixed(2)
@@ -347,7 +328,6 @@ export default function MusicZoneMap({
             `nav [${navigationCell.col},${navigationCell.row}] type=${navigationCell.type}`,
             `movement hit ${collision?.id || collision?.tag || 'none'} (${collision?.type || 'none'})`,
             `blocked axis ${movementDebug.blockedAxes.join(',') || 'none'}`,
-            'render order: scenery → sound markers → player (occlusion disabled)',
           ].join('\n')
         }
 
@@ -380,7 +360,7 @@ export default function MusicZoneMap({
           position: 'absolute', inset: 0, display: 'block', width: '100%', height: '100%',
           imageRendering: 'pixelated', zIndex: 0,
         }} />
-        <canvas ref={behindCanvasRef} aria-label="Music Village rear scenery" style={{
+        <canvas ref={markerCanvasRef} aria-label="Music Village sound markers" style={{
           position: 'absolute', inset: 0, display: 'block', width: '100%', height: '100%',
           imageRendering: 'pixelated', pointerEvents: 'none', zIndex: 1,
         }} />
@@ -390,9 +370,9 @@ export default function MusicZoneMap({
         }}>
           <div aria-hidden="true" style={{
             position: 'absolute', left: (MUSIC_PLAYER_W - 28) / 2, bottom: -3, width: 28, height: 9,
-            borderRadius: '50%', background: 'rgba(3,8,24,.38)', filter: 'blur(1px)',
+            borderRadius: '50%', background: 'rgba(3,8,24,.38)',
           }} />
-          <div style={{ position: 'absolute', inset: 0, filter: 'drop-shadow(0 0 3px rgba(135,125,255,.48))' }}>
+          <div style={{ position: 'absolute', inset: 0 }}>
             <PixelChar
               dir={dir}
               moving={moving}
@@ -406,14 +386,6 @@ export default function MusicZoneMap({
             />
           </div>
         </div>
-        <canvas ref={frontCanvasRef} aria-label="Music Village front scenery" style={{
-          position: 'absolute', inset: 0, display: 'block', width: '100%', height: '100%',
-          imageRendering: 'pixelated', pointerEvents: 'none', zIndex: 3,
-        }} />
-        <canvas ref={markerCanvasRef} aria-label="Music Village sound markers" style={{
-          position: 'absolute', inset: 0, display: 'block', width: '100%', height: '100%',
-          imageRendering: 'pixelated', pointerEvents: 'none', zIndex: 5,
-        }} />
         {debug && (
           <pre ref={debugPanelRef} data-testid="music-debug-panel" style={{
             position: 'absolute', left: 8, top: 8, zIndex: 8, margin: 0,

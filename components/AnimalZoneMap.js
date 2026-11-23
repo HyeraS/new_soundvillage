@@ -5,9 +5,10 @@ import { PixelChar, ZoneHUD, CompleteModal, ExitConfirmModal, DPad, SPRITE_W, SP
 import {
   T, BASE_MAP_SRC,
   loadAnimalVillage, moveWithCollision, spawnAnimalItems,
-  drawItem, drawLockFog, drawAnimalVillageLayer, drawAnimalDebug, PLAYER_BOX,
+  drawItem, drawAnimalVillageLayer, drawAnimalDebug, PLAYER_BOX,
 } from '@/lib/animalVillage'
 import { getCharacterRenderMetrics, placeCharacterAtScreenFoot } from '@/lib/characterRenderMetrics.mjs'
+import { drawLockedSoundMarker } from '@/lib/lockedSoundMarkerCanvas.mjs'
 import { useWalkFrame } from '@/components/useWalkFrame'
 import { getVillageRuntimeManifest } from '@/lib/villageRuntimeManifest.mjs'
 
@@ -270,6 +271,18 @@ export default function AnimalZoneMap({
         context.translate(-cameraX, -cameraY)
         context.scale(scaleX, scaleY)
         drawAnimalVillageLayer(context, village, now, playerY / scaleY, 'back')
+        drawAnimalVillageLayer(context, village, now, playerY / scaleY, 'front')
+        for (const item of items) {
+          const completed = collectedIdsRef.current.has(item.id)
+          if (!completed && item.block > blockNumRef.current) {
+            drawLockedSoundMarker(context, item.tx * T + T / 2, item.ty * T + T / 2)
+            continue
+          }
+          context.save()
+          if (completed) context.globalAlpha *= 0.38
+          drawItem(context, item, now)
+          context.restore()
+        }
         context.restore()
 
         const foreground = foregroundCanvas.getContext('2d')
@@ -281,16 +294,6 @@ export default function AnimalZoneMap({
         foreground.scale(zoom, zoom)
         foreground.translate(-cameraX, -cameraY)
         foreground.scale(scaleX, scaleY)
-        drawAnimalVillageLayer(foreground, village, now, playerY / scaleY, 'front')
-        // Scenery first, then collectible icons; the player sits above this canvas.
-        for (const item of items) {
-          if (item.block > blockNumRef.current) continue
-          const collected = collectedIdsRef.current.has(item.id)
-          if (collected) foreground.globalAlpha = 0.35
-          drawItem(foreground, item, now)
-          if (collected) foreground.globalAlpha = 1
-        }
-        drawLockFog(foreground, sounds, blockNumRef.current, now)
         if (debugOptions?.mask && village.walkableMask) {
           foreground.save()
           foreground.globalAlpha = 0.28
