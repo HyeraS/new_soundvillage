@@ -10,9 +10,6 @@ import {
   preloadMusicAssets, drawStatic, drawDepthLayer, drawMarker, drawEnvironment, drawNavigationDebug, drawExitCue, markerStateFor,
   splitOcclusionObjects,
   OCCLUSION_OBJECTS,
-  buildVillage, spawnMusicItems, moveWithCollisionDetailed, overlapsExitTrigger,
-  distanceToMusicItem, isMusicItemNearby, terrainSpeedAt, getNavigationTypeAtWorld, getNavigationCellAtWorld,
-  preloadMusicAssets, drawStatic, drawDepthLayer, drawMarker, drawEnvironment, drawNavigationDebug, drawExitCue, markerStateFor,
   getMusicCamera, worldToMusicScreen, getMusicPlayerPlacement,
 } from '@/lib/musicVillage'
 import { getCharacterRenderMetrics } from '@/lib/characterRenderMetrics.mjs'
