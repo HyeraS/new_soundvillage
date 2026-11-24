@@ -54,7 +54,7 @@ function drawMarkers(context, items, blockNum, collectedIds, nearbyId, now) {
       context.fill()
       context.stroke()
     }
-    if (!drawVillageCurrencyIcon(context, 'Urban', x, y, { size: iconSize })) {
+    if (!drawAnnotationMarkerIcon(context, 'Urban', item, x, y, { size: iconSize })) {
       context.beginPath()
       context.fillStyle = collected ? '#66717a' : nearby ? '#fff19a' : '#50e6ff'
       context.strokeStyle = nearby ? '#fff' : '#102a52'

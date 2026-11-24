@@ -5,10 +5,11 @@ import { useCollectiblePromptLogging, useKeys, SPEED } from '@/components/GameEn
 import { PixelChar, ZoneHUD, CompleteModal, ExitConfirmModal, DPad } from '@/components/ZoneMap'
 import {
   T, MAP_W, MAP_H, PLAYER_BOX, MUSIC_PLAYER_SOURCE, MUSIC_PLAYER_W, MUSIC_PLAYER_H,
-  OCCLUSION_OBJECTS,
   buildVillage, spawnMusicItems, moveWithCollisionDetailed, overlapsExitTrigger,
   distanceToMusicItem, isMusicItemNearby, terrainSpeedAt, getNavigationTypeAtWorld, getNavigationCellAtWorld,
   preloadMusicAssets, drawStatic, drawDepthLayer, drawMarker, drawEnvironment, drawNavigationDebug, drawExitCue, markerStateFor,
+  splitOcclusionObjects,
+  OCCLUSION_OBJECTS,
   getMusicCamera, worldToMusicScreen, getMusicPlayerPlacement,
 } from '@/lib/musicVillage'
 import { getCharacterRenderMetrics } from '@/lib/characterRenderMetrics.mjs'
@@ -362,7 +363,7 @@ export default function MusicZoneMap({
         }} />
         <div ref={playerWrapRef} data-testid="music-player" data-frame-index={frameIndex} style={{
           position: 'absolute', left: 0, top: 0, width: MUSIC_PLAYER_W, height: MUSIC_PLAYER_H,
-          transformOrigin: '0 0', pointerEvents: 'none', zIndex: 2,
+          transformOrigin: '0 0', pointerEvents: 'none', zIndex: 6,
         }}>
           <div aria-hidden="true" style={{
             position: 'absolute', left: (MUSIC_PLAYER_W - 28) / 2, bottom: -3, width: 28, height: 9,
