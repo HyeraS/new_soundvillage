@@ -7,7 +7,7 @@ import { useWalkFrame } from '@/components/useWalkFrame'
 import { getCharacterRenderMetrics, placeCharacterAtScreenFoot } from '@/lib/characterRenderMetrics.mjs'
 import { spawnUrbanV3SoundItems, URBAN_V3_SOUND_INTERACTION_RADIUS } from '@/lib/urbanV3SoundItems.mjs'
 import { drawLockedSoundMarker } from '@/lib/lockedSoundMarkerCanvas.mjs'
-import { drawVillageCurrencyIcon } from '@/lib/villageCurrencyIconCanvas.mjs'
+import { drawAnnotationMarkerIcon } from '@/lib/villageCurrencyIconCanvas.mjs'
 import {
   PLAYER_FOOT_BOX,
   SPAWN_POINTS,
